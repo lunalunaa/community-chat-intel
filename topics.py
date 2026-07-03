@@ -59,24 +59,24 @@ sys.path.insert(0, str(Path(__file__).parent))
 import analyze  # noqa: E402
 import languages as lang  # noqa: E402
 
-
 # ----------------------------------------------------------------------------
 # Topic categories — see plan.md §3.4
 # ----------------------------------------------------------------------------
 TOPIC_CATEGORIES = [
-    "install_help",       # asking how to install / deploy
-    "install_report",     # reporting install issue or sharing a fix
-    "provider_config",    # model provider setup or API key questions
+    "install_help",  # asking how to install / deploy
+    "install_report",  # reporting install issue or sharing a fix
+    "provider_config",  # model provider setup or API key questions
     "messaging_adapter",  # IM platform integration questions (Feishu / WeChat / etc.)
-    "feature_usage",      # using product-specific features (skills / memory / cron / etc.)
-    "model_discussion",   # which model is best / benchmarks / comparisons
-    "community_meta",     # announcements, meetups, links to external content
-    "brand_identity",     # "is [X site] official?" / authenticity questions
-    "bug_report",         # reproducible technical issue
-    "feature_request",    # "I wish this product could..."
-    "success_story",      # showing off something they built
-    "general_discussion", # catch-all, including casual chat
+    "feature_usage",  # using product-specific features (skills / memory / cron / etc.)
+    "model_discussion",  # which model is best / benchmarks / comparisons
+    "community_meta",  # announcements, meetups, links to external content
+    "brand_identity",  # "is [X site] official?" / authenticity questions
+    "bug_report",  # reproducible technical issue
+    "feature_request",  # "I wish this product could..."
+    "success_story",  # showing off something they built
+    "general_discussion",  # catch-all, including casual chat
 ]
+
 
 # ----------------------------------------------------------------------------
 # Prompt construction
@@ -90,8 +90,8 @@ def build_system_prompt_header(language_name: str | None) -> str:
     """
     bilingual_desc = (
         f"a {language_name}/English-bilingual message classifier"
-        if language_name else
-        "a multilingual message classifier"
+        if language_name
+        else "a multilingual message classifier"
     )
     brand_example_lang = (
         f"other {language_name}-language" if language_name else "other local-language"
@@ -144,8 +144,13 @@ def build_batch_prompt(batch: list[dict[str, str]], system_prompt_header: str) -
 # LLM CLI invocation
 # ----------------------------------------------------------------------------
 
-def call_llm_cli(prompt: str, provider: str | None = None, model: str | None = None,
-                timeout: int = 180) -> str:
+
+def call_llm_cli(
+    prompt: str,
+    provider: str | None = None,
+    model: str | None = None,
+    timeout: int = 180,
+) -> str:
     """Shell out to a local LLM CLI tool ("hermes chat -q ..." by default).
 
     Returns the raw stdout (with the leading `session_id: ...` line stripped,
@@ -153,13 +158,17 @@ def call_llm_cli(prompt: str, provider: str | None = None, model: str | None = N
     Raises subprocess.CalledProcessError or TimeoutExpired on failure.
     """
     cmd = [
-        "hermes", "chat",
-        "-q", prompt,
+        "hermes",
+        "chat",
+        "-q",
+        prompt,
         "--quiet",
-        "--ignore-rules",       # skip AGENTS.md / memory / skills injection
-        "--ignore-user-config", # skip custom config; use defaults from .env
-        "--max-turns", "1",     # single completion — no tool-calling loops
-        "--source", "tool",     # hide from user session list
+        "--ignore-rules",  # skip AGENTS.md / memory / skills injection
+        "--ignore-user-config",  # skip custom config; use defaults from .env
+        "--max-turns",
+        "1",  # single completion — no tool-calling loops
+        "--source",
+        "tool",  # hide from user session list
     ]
     if provider:
         cmd.extend(["--provider", provider])
@@ -226,6 +235,7 @@ def parse_llm_response(raw: str, expected_ids: list[str]) -> dict[str, str] | No
 # Cache
 # ----------------------------------------------------------------------------
 
+
 def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
@@ -238,7 +248,9 @@ class TopicCache:
             try:
                 self.data = json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
-                print(f"[cache] warning: {path} corrupt, starting fresh", file=sys.stderr)
+                print(
+                    f"[cache] warning: {path} corrupt, starting fresh", file=sys.stderr
+                )
                 self.data = {}
 
     def get(self, text: str) -> str | None:
@@ -250,7 +262,9 @@ class TopicCache:
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.write_text(
+            json.dumps(self.data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         tmp.replace(self.path)
 
 
@@ -258,8 +272,12 @@ class TopicCache:
 # Message loading (reuses analyze.py adapters)
 # ----------------------------------------------------------------------------
 
+
 def load_target_language_messages(
-    chat_path: Path, platform: str, salt: str, language_profile: lang.LanguageProfile | None
+    chat_path: Path,
+    platform: str,
+    salt: str,
+    language_profile: lang.LanguageProfile | None,
 ) -> list[analyze.Message]:
     """Load messages, filter to target + mixed (or all, if language_profile is None)."""
     adapter = analyze.ADAPTERS[platform]
@@ -277,6 +295,7 @@ def load_target_language_messages(
 # ----------------------------------------------------------------------------
 # Main pipeline
 # ----------------------------------------------------------------------------
+
 
 def process_batch(
     batch: list[analyze.Message],
@@ -307,10 +326,7 @@ def process_batch(
 
     # Truncate very long messages to avoid blowing context — we only need
     # enough signal to classify, not full content
-    batch_payload = [
-        {"id": m.message_id, "text": m.content[:800]}
-        for m in to_tag
-    ]
+    batch_payload = [{"id": m.message_id, "text": m.content[:800]} for m in to_tag]
     prompt = build_batch_prompt(batch_payload, system_prompt_header)
     expected_ids = [m.message_id for m in to_tag]
 
@@ -318,12 +334,18 @@ def process_batch(
     try:
         raw = call_llm_cli(prompt, provider=provider, model=model)
     except subprocess.TimeoutExpired:
-        print(f"[llm-cli] timeout on batch of {len(to_tag)}; marking all as general_discussion", file=sys.stderr)
+        print(
+            f"[llm-cli] timeout on batch of {len(to_tag)}; marking all as general_discussion",
+            file=sys.stderr,
+        )
         for m in to_tag:
             results[m.message_id] = "general_discussion"
         return results
     except subprocess.CalledProcessError as e:
-        print(f"[llm-cli] error on batch of {len(to_tag)}: {e.stderr[:500]}", file=sys.stderr)
+        print(
+            f"[llm-cli] error on batch of {len(to_tag)}: {e.stderr[:500]}",
+            file=sys.stderr,
+        )
         for m in to_tag:
             results[m.message_id] = "general_discussion"
         return results
@@ -332,7 +354,10 @@ def process_batch(
 
     if parsed is None and len(to_tag) > 1:
         # Retry each message individually — slower but more reliable
-        print(f"[parse] batch parse failed; retrying {len(to_tag)} individually", file=sys.stderr)
+        print(
+            f"[parse] batch parse failed; retrying {len(to_tag)} individually",
+            file=sys.stderr,
+        )
         parsed = {}
         for m in to_tag:
             single_prompt = build_batch_prompt(
@@ -383,16 +408,23 @@ def run(
     )
 
     salt = analyze.ensure_salt(salt_path)
-    messages = load_target_language_messages(chat_path, platform, salt, language_profile)
+    messages = load_target_language_messages(
+        chat_path, platform, salt, language_profile
+    )
     if limit:
         messages = messages[:limit]
 
     lang_desc = language_profile.name if language_profile else "all-language"
-    print(f"[topics] {len(messages)} {lang_desc}/mixed messages to tag "
-          f"(cache has {len(cache.data)} entries)", file=sys.stderr)
+    print(
+        f"[topics] {len(messages)} {lang_desc}/mixed messages to tag "
+        f"(cache has {len(cache.data)} entries)",
+        file=sys.stderr,
+    )
 
     # Build batches
-    batches = [messages[i:i + batch_size] for i in range(0, len(messages), batch_size)]
+    batches = [
+        messages[i : i + batch_size] for i in range(0, len(messages), batch_size)
+    ]
     print(f"[topics] {len(batches)} batches of ≤{batch_size} messages", file=sys.stderr)
 
     all_results: dict[str, str] = {}
@@ -400,29 +432,47 @@ def run(
 
     if concurrency <= 1:
         for i, batch in enumerate(batches):
-            batch_results = process_batch(batch, provider, model, cache, dry_run, system_prompt_header)
+            batch_results = process_batch(
+                batch, provider, model, cache, dry_run, system_prompt_header
+            )
             all_results.update(batch_results)
             cache.save()  # persist after each batch so Ctrl-C is safe
             elapsed = time.time() - start
-            print(f"[topics] batch {i+1}/{len(batches)} done "
-                  f"({len(all_results)}/{len(messages)} msgs, {elapsed:.0f}s)",
-                  file=sys.stderr)
+            print(
+                f"[topics] batch {i + 1}/{len(batches)} done "
+                f"({len(all_results)}/{len(messages)} msgs, {elapsed:.0f}s)",
+                file=sys.stderr,
+            )
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as ex:
-            futures = {ex.submit(process_batch, b, provider, model, cache, dry_run, system_prompt_header): i
-                       for i, b in enumerate(batches)}
+            futures = {
+                ex.submit(
+                    process_batch,
+                    b,
+                    provider,
+                    model,
+                    cache,
+                    dry_run,
+                    system_prompt_header,
+                ): i
+                for i, b in enumerate(batches)
+            }
             for f in as_completed(futures):
                 batch_results = f.result()
                 all_results.update(batch_results)
                 cache.save()
                 elapsed = time.time() - start
-                print(f"[topics] one batch done "
-                      f"({len(all_results)}/{len(messages)} msgs, {elapsed:.0f}s)",
-                      file=sys.stderr)
+                print(
+                    f"[topics] one batch done "
+                    f"({len(all_results)}/{len(messages)} msgs, {elapsed:.0f}s)",
+                    file=sys.stderr,
+                )
 
     # Write topics.json (message_id → topic)
     topics_out = out_path.parent / "topics.json"
-    topics_out.write_text(json.dumps(all_results, ensure_ascii=False, indent=2), encoding="utf-8")
+    topics_out.write_text(
+        json.dumps(all_results, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"[write] {topics_out}", file=sys.stderr)
 
     # Write topics_by_category.json (category → [message_ids])
@@ -431,8 +481,10 @@ def run(
         by_cat[topic].append(mid)
     by_cat_out = out_path.parent / "topics_by_category.json"
     by_cat_out.write_text(
-        json.dumps({k: sorted(v) for k, v in by_cat.items()}, ensure_ascii=False, indent=2),
-        encoding="utf-8"
+        json.dumps(
+            {k: sorted(v) for k, v in by_cat.items()}, ensure_ascii=False, indent=2
+        ),
+        encoding="utf-8",
     )
     print(f"[write] {by_cat_out}", file=sys.stderr)
 
@@ -447,7 +499,9 @@ def run(
             "counts": dict(counts.most_common()),
             "by_category": {k: len(v) for k, v in by_cat.items()},
         }
-        stats_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
+        stats_path.write_text(
+            json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(f"[merge] updated {stats_path} with .topics section", file=sys.stderr)
 
         # Re-render report.md so §9b shows real data
@@ -459,66 +513,120 @@ def run(
             print(f"[re-render] {report_path} with topics", file=sys.stderr)
 
     elapsed = time.time() - start
-    print(f"[done] tagged {len(all_results)} messages in {elapsed:.0f}s", file=sys.stderr)
+    print(
+        f"[done] tagged {len(all_results)} messages in {elapsed:.0f}s", file=sys.stderr
+    )
 
 
 # ----------------------------------------------------------------------------
 # CLI
 # ----------------------------------------------------------------------------
 
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="LLM topic-tagging pass for community chat analysis.")
-    p.add_argument("--input-chat", required=True, type=Path,
-                   help="Chat export JSON (same file used with analyze.py)")
+    p = argparse.ArgumentParser(
+        description="LLM topic-tagging pass for community chat analysis."
+    )
+    p.add_argument(
+        "--input-chat",
+        required=True,
+        type=Path,
+        help="Chat export JSON (same file used with analyze.py)",
+    )
     p.add_argument("--platform", required=True, choices=list(analyze.ADAPTERS.keys()))
-    p.add_argument("--target-language", type=str, default="zh",
-                   help="Language code to filter/tag messages for (see languages.py "
-                        "LANGUAGE_PROFILES; default: zh). Pass 'none' to tag every message "
-                        "regardless of language classification.")
-    p.add_argument("--out", type=Path, default=Path("./out/topics.json"),
-                   help="Output path for topics.json (default: ./out/topics.json)")
-    p.add_argument("--salt-file", type=Path,
-                   default=Path(__file__).parent / "user_hash_salt.key")
-    p.add_argument("--stats-path", type=Path, default=None,
-                   help="Path to stats.json to merge .topics into (default: <out>/stats.json)")
-    p.add_argument("--batch-size", type=int, default=25,
-                   help="Messages per LLM CLI call (default: 25)")
-    p.add_argument("--concurrency", type=int, default=1,
-                   help="Parallel LLM CLI subprocesses (default: 1 — sequential)")
-    p.add_argument("--provider", type=str, default=None,
-                   help="LLM CLI --provider override (default: whatever you have configured)")
-    p.add_argument("--model", type=str, default=None,
-                   help="LLM CLI --model override")
-    p.add_argument("--dry-run", action="store_true",
-                   help="Don't call the LLM CLI; tag everything as general_discussion (for pipeline shape testing)")
-    p.add_argument("--limit", type=int, default=None,
-                   help="Only process the first N target-language messages (for testing / cost-capping)")
+    p.add_argument(
+        "--target-language",
+        type=str,
+        default="zh",
+        help="Language code to filter/tag messages for (see languages.py "
+        "LANGUAGE_PROFILES; default: zh). Pass 'none' to tag every message "
+        "regardless of language classification.",
+    )
+    p.add_argument(
+        "--out",
+        type=Path,
+        default=Path("./out/topics.json"),
+        help="Output path for topics.json (default: ./out/topics.json)",
+    )
+    p.add_argument(
+        "--salt-file", type=Path, default=Path(__file__).parent / "user_hash_salt.key"
+    )
+    p.add_argument(
+        "--stats-path",
+        type=Path,
+        default=None,
+        help="Path to stats.json to merge .topics into (default: <out>/stats.json)",
+    )
+    p.add_argument(
+        "--batch-size",
+        type=int,
+        default=25,
+        help="Messages per LLM CLI call (default: 25)",
+    )
+    p.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="Parallel LLM CLI subprocesses (default: 1 — sequential)",
+    )
+    p.add_argument(
+        "--provider",
+        type=str,
+        default=None,
+        help="LLM CLI --provider override (default: whatever you have configured)",
+    )
+    p.add_argument("--model", type=str, default=None, help="LLM CLI --model override")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Don't call the LLM CLI; tag everything as general_discussion (for pipeline shape testing)",
+    )
+    p.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Only process the first N target-language messages (for testing / cost-capping)",
+    )
     args = p.parse_args()
 
     language_profile = lang.get_language_profile(args.target_language)
     if args.target_language not in (None, "none", "off") and language_profile is None:
-        print(f"[warn] unknown --target-language '{args.target_language}'; "
-              f"known codes: {', '.join(sorted(lang.LANGUAGE_PROFILES))}. "
-              f"Falling back to no language filtering.", file=sys.stderr)
+        print(
+            f"[warn] unknown --target-language '{args.target_language}'; "
+            f"known codes: {', '.join(sorted(lang.LANGUAGE_PROFILES))}. "
+            f"Falling back to no language filtering.",
+            file=sys.stderr,
+        )
 
     # Check the LLM CLI is available unless dry-run
     if not args.dry_run:
         try:
-            r = subprocess.run(["hermes", "--version"], capture_output=True, text=True, timeout=10)
+            r = subprocess.run(
+                ["hermes", "--version"], capture_output=True, text=True, timeout=10
+            )
             if r.returncode != 0:
-                print("[error] `hermes --version` failed. Is your LLM CLI installed and on PATH? "
-                      "(edit call_llm_cli() to point at your own CLI if it isn't named `hermes`)",
-                      file=sys.stderr)
+                print(
+                    "[error] `hermes --version` failed. Is your LLM CLI installed and on PATH? "
+                    "(edit call_llm_cli() to point at your own CLI if it isn't named `hermes`)",
+                    file=sys.stderr,
+                )
                 return 2
-            print(f"[llm-cli] {r.stdout.strip().splitlines()[0] if r.stdout else 'found'}",
-                  file=sys.stderr)
+            print(
+                f"[llm-cli] {r.stdout.strip().splitlines()[0] if r.stdout else 'found'}",
+                file=sys.stderr,
+            )
         except FileNotFoundError:
-            print("[error] `hermes` not found on PATH. Install your LLM CLI of choice, "
-                  "or edit call_llm_cli() to invoke a different command.",
-                  file=sys.stderr)
+            print(
+                "[error] `hermes` not found on PATH. Install your LLM CLI of choice, "
+                "or edit call_llm_cli() to invoke a different command.",
+                file=sys.stderr,
+            )
             return 2
         except subprocess.TimeoutExpired:
-            print("[error] `hermes --version` timed out. Your LLM CLI may be misconfigured.", file=sys.stderr)
+            print(
+                "[error] `hermes --version` timed out. Your LLM CLI may be misconfigured.",
+                file=sys.stderr,
+            )
             return 2
 
     run(

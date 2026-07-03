@@ -217,7 +217,6 @@ def user_has_competitor(u: dict) -> str:
     return "yes" if competitors else "no"
 
 
-
 # ----------------------------------------------------------------------------
 # Pivot builder
 # ----------------------------------------------------------------------------
@@ -347,7 +346,9 @@ def build_crosstabs(
     md_sections.append(
         f"**Cohort size:** {len(cohort_users)} users (target-language primary + bilingual).  "
     )
-    md_sections.append(f"**Region profile:** {region_profile.name} (`{region_profile.code}`)  ")
+    md_sections.append(
+        f"**Region profile:** {region_profile.name} (`{region_profile.code}`)  "
+    )
     md_sections.append(f"**Reference time:** {now.isoformat()}  ")
     md_sections.append(f"**Total users in dataset:** {len(users)}")
     md_sections.append("")
@@ -371,7 +372,12 @@ def build_crosstabs(
     }
 
     # --- 1. Provider cluster × Location -----------------------------------
-    t = pivot(cohort_users, lambda u: user_provider_clusters(u, provider_clusters), location_fn, multi_row=True)
+    t = pivot(
+        cohort_users,
+        lambda u: user_provider_clusters(u, provider_clusters),
+        location_fn,
+        multi_row=True,
+    )
     crosstabs["provider_cluster_x_location"] = t
     md_sections.append(
         format_table_md(
@@ -537,9 +543,9 @@ def main() -> int:
         type=str,
         default="cn",
         help="Region code controlling timezone-proxy buckets and regional-provider "
-             "clustering (see languages.py REGION_PROFILES: cn, jp, kr, ru, latam, mena, "
-             "global, ...). Unknown codes fall back to 'global'. Default: cn "
-             "(backward-compatible).",
+        "clustering (see languages.py REGION_PROFILES: cn, jp, kr, ru, latam, mena, "
+        "global, ...). Unknown codes fall back to 'global'. Default: cn "
+        "(backward-compatible).",
     )
     args = p.parse_args()
 
@@ -552,9 +558,12 @@ def main() -> int:
 
     region_profile = lang.get_region_profile(args.region)
     if args.region not in lang.REGION_PROFILES:
-        print(f"[warn] unknown --region '{args.region}'; "
-              f"known codes: {', '.join(sorted(lang.REGION_PROFILES))}. "
-              f"Falling back to 'global'.", file=sys.stderr)
+        print(
+            f"[warn] unknown --region '{args.region}'; "
+            f"known codes: {', '.join(sorted(lang.REGION_PROFILES))}. "
+            f"Falling back to 'global'.",
+            file=sys.stderr,
+        )
 
     users_data = json.loads(args.users_json.read_text(encoding="utf-8"))
     # users.json is dict {user_id: user_obj}; convert to list

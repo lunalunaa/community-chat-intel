@@ -58,38 +58,45 @@ class LanguageProfile:
 
 LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
     "zh": LanguageProfile(
-        "zh", "Chinese",
+        "zh",
+        "Chinese",
         script_ranges=(r"\u4e00-\u9fff", r"\u3400-\u4dbf"),
         threshold=0.30,
     ),
     "ja": LanguageProfile(
-        "ja", "Japanese",
+        "ja",
+        "Japanese",
         # Hiragana + Katakana + shared CJK ideographs
         script_ranges=(r"\u3040-\u30ff", r"\u4e00-\u9fff"),
         threshold=0.30,
     ),
     "ko": LanguageProfile(
-        "ko", "Korean",
+        "ko",
+        "Korean",
         script_ranges=(r"\uac00-\ud7a3", r"\u1100-\u11ff"),
         threshold=0.30,
     ),
     "ru": LanguageProfile(
-        "ru", "Russian",
+        "ru",
+        "Russian",
         script_ranges=(r"\u0400-\u04ff",),
         threshold=0.30,
     ),
     "ar": LanguageProfile(
-        "ar", "Arabic",
+        "ar",
+        "Arabic",
         script_ranges=(r"\u0600-\u06ff",),
         threshold=0.30,
     ),
     "he": LanguageProfile(
-        "he", "Hebrew",
+        "he",
+        "Hebrew",
         script_ranges=(r"\u0590-\u05ff",),
         threshold=0.30,
     ),
     "th": LanguageProfile(
-        "th", "Thai",
+        "th",
+        "Thai",
         script_ranges=(r"\u0e00-\u0e7f",),
         threshold=0.30,
     ),
@@ -98,7 +105,9 @@ LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
     # script-ratio approach (as with the original CJK-only heuristic this
     # pipeline shipped with) — treat as directional, spot-check a sample.
     "es": LanguageProfile(
-        "es", "Spanish", threshold=0.15,
+        "es",
+        "Spanish",
+        threshold=0.15,
         stopwords=frozenset(
             "que de la el en y a los se del las un por con no una su para es "
             "al lo como más pero sus le ya o este sí porque esta entre cuando "
@@ -106,7 +115,9 @@ LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
         ),
     ),
     "fr": LanguageProfile(
-        "fr", "French", threshold=0.15,
+        "fr",
+        "French",
+        threshold=0.15,
         stopwords=frozenset(
             "le de un être et à il avoir ne je son que se qui ce dans en du "
             "elle au de ce le pour pas vous par sur avec tout faire son mettre "
@@ -114,7 +125,9 @@ LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
         ),
     ),
     "de": LanguageProfile(
-        "de", "German", threshold=0.15,
+        "de",
+        "German",
+        threshold=0.15,
         stopwords=frozenset(
             "der die und in den von zu das mit sich des auf für ist im dem "
             "nicht ein eine als auch es an werden aus er hat dass sie nach "
@@ -122,7 +135,9 @@ LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
         ),
     ),
     "pt": LanguageProfile(
-        "pt", "Portuguese", threshold=0.15,
+        "pt",
+        "Portuguese",
+        threshold=0.15,
         stopwords=frozenset(
             "de a o que e do da em um para é com não uma os no se na por mais "
             "as dos como mas foi ao ele das tem à seu sua ou ser quando muito "
@@ -130,7 +145,9 @@ LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
         ),
     ),
     "id": LanguageProfile(
-        "id", "Indonesian", threshold=0.15,
+        "id",
+        "Indonesian",
+        threshold=0.15,
         stopwords=frozenset(
             "yang dan di itu dengan untuk tidak ini dari dalam akan pada "
             "juga saya ke karena tersebut bisa ada mereka lebih atau saat "
@@ -138,7 +155,8 @@ LANGUAGE_PROFILES: dict[str, LanguageProfile] = {
         ),
     ),
     "vi": LanguageProfile(
-        "vi", "Vietnamese",
+        "vi",
+        "Vietnamese",
         script_ranges=(r"\u1ea0-\u1ef9", r"\u00c0-\u1ef9"),
         threshold=0.05,
     ),
@@ -226,7 +244,8 @@ class RegionProfile:
 
 REGION_PROFILES: dict[str, RegionProfile] = {
     "cn": RegionProfile(
-        "cn", "Greater China",
+        "cn",
+        "Greater China",
         shadow_community={
             "zhihu": ["zhihu", "知乎", "zhuanlan"],
             "wechat_oa": ["公众号", "微信公众号", "official account"],
@@ -244,17 +263,27 @@ REGION_PROFILES: dict[str, RegionProfile] = {
             "github_discussions": ["github discussions", "github issues"],
         },
         timezone_buckets={
-            "mainland_evening": (12, 16),   # UTC 12-16 = evening 20-24 Beijing (UTC+8)
-            "na_evening": (0, 6),            # UTC 0-6 = evening PT/ET
-            "eu_evening": (18, 22),          # UTC 18-22 = evening CET
+            "mainland_evening": (12, 16),  # UTC 12-16 = evening 20-24 Beijing (UTC+8)
+            "na_evening": (0, 6),  # UTC 0-6 = evening PT/ET
+            "eu_evening": (18, 22),  # UTC 18-22 = evening CET
         },
         regional_providers=frozenset(
-            {"deepseek", "kimi_moonshot", "qwen_alibaba", "glm_zhipu", "minimax",
-             "volcengine_ark", "doubao", "baichuan", "yi_01ai"}
+            {
+                "deepseek",
+                "kimi_moonshot",
+                "qwen_alibaba",
+                "glm_zhipu",
+                "minimax",
+                "volcengine_ark",
+                "doubao",
+                "baichuan",
+                "yi_01ai",
+            }
         ),
     ),
     "jp": RegionProfile(
-        "jp", "Japan",
+        "jp",
+        "Japan",
         shadow_community={
             "note_jp": ["note.com", "note投稿"],
             "qiita": ["qiita"],
@@ -266,13 +295,14 @@ REGION_PROFILES: dict[str, RegionProfile] = {
             "github_discussions": ["github discussions", "github issues"],
         },
         timezone_buckets={
-            "jp_evening": (11, 15),   # UTC 11-15 = evening 20-24 JST (UTC+9)
+            "jp_evening": (11, 15),  # UTC 11-15 = evening 20-24 JST (UTC+9)
             "na_evening": (0, 6),
             "eu_evening": (18, 22),
         },
     ),
     "kr": RegionProfile(
-        "kr", "Korea",
+        "kr",
+        "Korea",
         shadow_community={
             "naver_blog": ["naver blog", "네이버 블로그"],
             "velog": ["velog"],
@@ -283,13 +313,14 @@ REGION_PROFILES: dict[str, RegionProfile] = {
             "github_discussions": ["github discussions", "github issues"],
         },
         timezone_buckets={
-            "kr_evening": (11, 15),   # UTC 11-15 = evening 20-24 KST (UTC+9)
+            "kr_evening": (11, 15),  # UTC 11-15 = evening 20-24 KST (UTC+9)
             "na_evening": (0, 6),
             "eu_evening": (18, 22),
         },
     ),
     "ru": RegionProfile(
-        "ru", "Russia / CIS",
+        "ru",
+        "Russia / CIS",
         shadow_community={
             "vk": ["vk.com", "вконтакте"],
             "habr": ["habr.com", "хабр"],
@@ -305,7 +336,8 @@ REGION_PROFILES: dict[str, RegionProfile] = {
         regional_providers=frozenset({"yandexgpt"}),
     ),
     "latam": RegionProfile(
-        "latam", "Latin America",
+        "latam",
+        "Latin America",
         shadow_community={
             "reddit_es": ["reddit", r"\br/"],
             "youtube_latam": ["youtube", "youtube tutorial"],
@@ -314,13 +346,17 @@ REGION_PROFILES: dict[str, RegionProfile] = {
             "github_discussions": ["github discussions", "github issues"],
         },
         timezone_buckets={
-            "latam_evening": (22, 24),  # UTC 22-24/0-3 wraps; approximate BRT/ART evening
+            "latam_evening": (
+                22,
+                24,
+            ),  # UTC 22-24/0-3 wraps; approximate BRT/ART evening
             "na_evening": (0, 6),
             "eu_evening": (18, 22),
         },
     ),
     "mena": RegionProfile(
-        "mena", "Middle East / North Africa",
+        "mena",
+        "Middle East / North Africa",
         shadow_community={
             "reddit_arabic": ["reddit", r"\br/"],
             "telegram_channel": ["قناة تيليجرام", "telegram channel"],
@@ -334,7 +370,8 @@ REGION_PROFILES: dict[str, RegionProfile] = {
         },
     ),
     "global": RegionProfile(
-        "global", "Global / English-default",
+        "global",
+        "Global / English-default",
         shadow_community={
             "reddit": ["reddit", r"\br/"],
             "hackernews": ["hacker news", "hn", "y combinator"],

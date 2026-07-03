@@ -10,10 +10,11 @@ Sections:
   - 4. Limitations & Caveats (written directly here)
   - 5. Appendices (file inventory)
 """
+
 import json
 import os
-import subprocess
 import re
+import subprocess
 import time
 from pathlib import Path
 
@@ -28,7 +29,7 @@ v2_text = (BASE / "findings_final_v2.md").read_text()
 # Split: "# ... # 1. Executive Summary ... # 2. ..." — we want exec summary as its own section
 # and sections 2-14 as the "Findings" body
 # Strategy: split on "## N. " headers
-parts = re.split(r'^## (\d+)\. ', v2_text, flags=re.MULTILINE)
+parts = re.split(r"^## (\d+)\. ", v2_text, flags=re.MULTILINE)
 # parts[0] = everything before "## 1. " (front matter)
 # parts[1] = "1", parts[2] = "Executive Summary\n...\n", parts[3] = "2", parts[4] = "Who Are They?...", etc.
 exec_summary = parts[2] if len(parts) > 2 else ""
@@ -36,7 +37,7 @@ exec_summary = parts[2] if len(parts) > 2 else ""
 body_chunks = []
 i = 3
 while i + 1 < len(parts):
-    body_chunks.append(f"## {int(parts[i])-1}. {parts[i+1].rstrip()}")
+    body_chunks.append(f"## {int(parts[i]) - 1}. {parts[i + 1].rstrip()}")
     i += 2
 findings_body = "\n\n".join(body_chunks)
 
@@ -46,9 +47,13 @@ findings_body = "\n\n".join(body_chunks)
 # Load key summary data
 topics = json.load((BASE / "topics.json").open())
 from collections import Counter
+
 topic_counts = Counter(topics.values())
 total_tagged = sum(topic_counts.values())
-topic_dist = {k: f"{v:,} ({round(100*v/total_tagged,1)}%)" for k,v in topic_counts.most_common()}
+topic_dist = {
+    k: f"{v:,} ({round(100 * v / total_tagged, 1)}%)"
+    for k, v in topic_counts.most_common()
+}
 
 stream_c_summary = json.load((BASE / "stream_c/summary.json").open())
 pareto = json.load((BASE / "stream_d/user_pareto_v4.json").open())
@@ -95,7 +100,7 @@ Topic distribution (tagged messages):
 {json.dumps(topic_dist, ensure_ascii=False, indent=1)}
 
 Stream C fact counts:
-{json.dumps({k:v for k,v in stream_c_summary['overview'].items() if not k.startswith('_')}, ensure_ascii=False, indent=1)}
+{json.dumps({k: v for k, v in stream_c_summary["overview"].items() if not k.startswith("_")}, ensure_ascii=False, indent=1)}
 
 Known structural context to weigh:
 {STRUCTURAL_CONTEXT}
@@ -135,20 +140,41 @@ Rules:
 print(f"Recommendations context: {len(rec_context):,} chars", flush=True)
 
 # Call MiMo
-cmd = ["hermes", "chat", "-q", rec_context, "--quiet", "--ignore-rules", "--ignore-user-config",
-       "--max-turns", "1", "--source", "tool",
-       "--provider", os.environ.get("LLM_PROVIDER", "nous"),
-       "--model", os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro")]
+cmd = [
+    "hermes",
+    "chat",
+    "-q",
+    rec_context,
+    "--quiet",
+    "--ignore-rules",
+    "--ignore-user-config",
+    "--max-turns",
+    "1",
+    "--source",
+    "tool",
+    "--provider",
+    os.environ.get("LLM_PROVIDER", "nous"),
+    "--model",
+    os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro"),
+]
 print("Calling xiaomi/mimo-v2.5-pro for Recommendations section...", flush=True)
 t0 = time.time()
 r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)
 elapsed = time.time() - t0
 print(f"Got recommendations in {elapsed:.0f}s ({len(r.stdout):,} chars)", flush=True)
 out = r.stdout
-lines = [l for l in out.split('\n') if not l.startswith('session_id:') and not l.startswith('⚠️') and 'maximum iterations' not in l and 'file write failed' not in l.lower() and not l.startswith('The file')]
-recommendations = '\n'.join(lines).strip()
+lines = [
+    l
+    for l in out.split("\n")
+    if not l.startswith("session_id:")
+    and not l.startswith("⚠️")
+    and "maximum iterations" not in l
+    and "file write failed" not in l.lower()
+    and not l.startswith("The file")
+]
+recommendations = "\n".join(lines).strip()
 # Strip leading --- separators from TUI leaks
-recommendations = re.sub(r'^-{3,}\s*\n', '', recommendations, count=1)
+recommendations = re.sub(r"^-{3,}\s*\n", "", recommendations, count=1)
 
 # =========================================================================
 # Methodology (written directly)
@@ -232,14 +258,20 @@ limitations = """## 4. Limitations & Caveats
 
 **Competitor/provider mention counts are mention counts, not usage counts.** A user mentioning a competitor product many times may not use it at all — they may be complaining about it. Sentiment-weighted mention analysis partially corrects for this but is not a substitute for real usage-tracking data."""
 
+
 # =========================================================================
 # Appendices
 # =========================================================================
 def format_size(p):
     try:
-        return f"{p.stat().st_size // 1024:>6,} KB" if p.stat().st_size > 1024 else f"{p.stat().st_size:>6,} B "
+        return (
+            f"{p.stat().st_size // 1024:>6,} KB"
+            if p.stat().st_size > 1024
+            else f"{p.stat().st_size:>6,} B "
+        )
     except:
         return ""
+
 
 appendices = """## 5. Appendices
 
@@ -302,11 +334,16 @@ Rerun with reproducible output by executing them in the order above against your
 # Assemble
 # =========================================================================
 REPORT_TITLE = os.environ.get("REPORT_TITLE", "Community Survey & Recommendations")
-REPORT_SUBJECT = os.environ.get("REPORT_SUBJECT", "(set REPORT_SUBJECT to describe your chat/community)")
-REPORT_PERIOD = os.environ.get("REPORT_PERIOD", "(set REPORT_PERIOD, e.g. '2026-04-03 -> 2026-04-23')")
+REPORT_SUBJECT = os.environ.get(
+    "REPORT_SUBJECT", "(set REPORT_SUBJECT to describe your chat/community)"
+)
+REPORT_PERIOD = os.environ.get(
+    "REPORT_PERIOD", "(set REPORT_PERIOD, e.g. '2026-04-03 -> 2026-04-23')"
+)
 REPORT_CLASSIFICATION = os.environ.get("REPORT_CLASSIFICATION", "Internal")
 
-header = f"""# {REPORT_TITLE}
+header = (
+    f"""# {REPORT_TITLE}
 
 **Subject:** {REPORT_SUBJECT}
 **Period analyzed:** {REPORT_PERIOD}
@@ -317,11 +354,14 @@ header = f"""# {REPORT_TITLE}
 
 ## Executive Summary
 
-""" + exec_summary.strip() + """
+"""
+    + exec_summary.strip()
+    + """
 
 ---
 
 """
+)
 
 report = (
     header
@@ -336,6 +376,8 @@ report = (
     + appendices
 )
 
-OUT.write_text(report, encoding='utf-8')
+OUT.write_text(report, encoding="utf-8")
 print(f"\nWrote {OUT}")
-print(f"Size: {OUT.stat().st_size // 1024} KB, {len(report.split()):,} words, {report.count(chr(10))+1} lines")
+print(
+    f"Size: {OUT.stat().st_size // 1024} KB, {len(report.split()):,} words, {report.count(chr(10)) + 1} lines"
+)

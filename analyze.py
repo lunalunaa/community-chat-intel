@@ -50,8 +50,8 @@ import json
 import re
 import secrets
 import sys
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -61,6 +61,7 @@ import languages as lang  # local languages.py
 # ----------------------------------------------------------------------------
 # Canonical message schema
 # ----------------------------------------------------------------------------
+
 
 @dataclass
 class Message:
@@ -79,6 +80,7 @@ class Message:
 # ----------------------------------------------------------------------------
 # Adapters — one per platform
 # ----------------------------------------------------------------------------
+
 
 def _hash_id(raw_id: str, salt: str) -> str:
     return hashlib.sha256(f"{salt}:{raw_id}".encode()).hexdigest()[:16]
@@ -151,7 +153,11 @@ def load_telegram_export(path: Path, salt: str) -> Iterator[Message]:
             author_name=msg.get("from") or "unknown",
             timestamp=_parse_ts(msg.get("date", "")),
             content=text,
-            reply_to_message_id=(str(msg["reply_to_message_id"]) if msg.get("reply_to_message_id") else None),
+            reply_to_message_id=(
+                str(msg["reply_to_message_id"])
+                if msg.get("reply_to_message_id")
+                else None
+            ),
             reactions=[],
             attachment_count=1 if msg.get("file") or msg.get("photo") else 0,
         )
@@ -169,7 +175,9 @@ def load_canonical(path: Path, salt: str) -> Iterator[Message]:
             platform=msg.get("platform", "canonical"),
             channel=msg.get("channel", ""),
             message_id=str(msg.get("message_id", "")),
-            author_id=_hash_id(str(msg.get("author_id", "")), salt) if not msg.get("author_id", "").startswith(("sha256:", "hash:")) else msg["author_id"],
+            author_id=_hash_id(str(msg.get("author_id", "")), salt)
+            if not msg.get("author_id", "").startswith(("sha256:", "hash:"))
+            else msg["author_id"],
             author_name=msg.get("author_name", "unknown"),
             timestamp=_parse_ts(msg.get("timestamp", "")),
             content=msg.get("content", ""),
@@ -182,6 +190,7 @@ def load_canonical(path: Path, salt: str) -> Iterator[Message]:
 # ----------------------------------------------------------------------------
 # Lark / Feishu adapter
 # ----------------------------------------------------------------------------
+
 
 def _lark_decode_content(msg_type: str, raw: Any) -> tuple[str, int]:
     """Lark message `content` is a JSON-encoded string keyed by msg_type in the
@@ -209,7 +218,9 @@ def _lark_decode_content(msg_type: str, raw: Any) -> tuple[str, int]:
         # Pre-decoded plain text from the shortcut — determine attachment count
         # from msg_type alone (the shortcut's textification doesn't include
         # structured metadata)
-        att = 1 if (msg_type or "").lower() in ("image", "file", "audio", "video") else 0
+        att = (
+            1 if (msg_type or "").lower() in ("image", "file", "audio", "video") else 0
+        )
         return (raw, att)
 
     # Raw API path: JSON-encoded content string
@@ -228,7 +239,9 @@ def _lark_decode_content(msg_type: str, raw: Any) -> tuple[str, int]:
         lines = []
         for para in paragraphs:
             if isinstance(para, list):
-                line = "".join((seg.get("text") or "") for seg in para if isinstance(seg, dict))
+                line = "".join(
+                    (seg.get("text") or "") for seg in para if isinstance(seg, dict)
+                )
                 lines.append(line)
         body = "\n".join(lines)
         title = c.get("title") or ""
@@ -258,7 +271,9 @@ def _lark_decode_content(msg_type: str, raw: Any) -> tuple[str, int]:
                 rendered = tmpl
                 for k, v in c.items():
                     if isinstance(v, list) and k != "divider_text":
-                        rendered = rendered.replace("{" + k + "}", ", ".join(str(x) for x in v))
+                        rendered = rendered.replace(
+                            "{" + k + "}", ", ".join(str(x) for x in v)
+                        )
                 return (f"[System: {rendered}]", 0)
             except Exception:
                 pass
@@ -278,7 +293,9 @@ def _lark_timestamp(raw: Any) -> datetime:
     # Try ISO-8601 or display-format strings first
     if isinstance(raw, str):
         # ISO-8601: contains "T" or offset
-        if "T" in raw or (len(raw) >= 10 and raw[4] == "-" and raw[7] == "-" and "+" in raw[10:]):
+        if "T" in raw or (
+            len(raw) >= 10 and raw[4] == "-" and raw[7] == "-" and "+" in raw[10:]
+        ):
             return _parse_ts(raw)
         # Display format: "YYYY-MM-DD HH:MM[:SS]"
         if len(raw) >= 16 and raw[4] == "-" and raw[7] == "-" and raw[10] == " ":
@@ -287,7 +304,9 @@ def _lark_timestamp(raw: Any) -> datetime:
                     dt = datetime.strptime(raw, fmt)
                     # The shortcut emits these in LOCAL time with NO tz marker;
                     # assume UTC+8 (the Lark/Feishu default) to avoid silently misclassifying.
-                    return dt.replace(tzinfo=timezone(timedelta(hours=8))).astimezone(timezone.utc)
+                    return dt.replace(tzinfo=timezone(timedelta(hours=8))).astimezone(
+                        timezone.utc
+                    )
                 except ValueError:
                     continue
 
@@ -407,8 +426,10 @@ def _dispatch_parsed_lark(obj: Any) -> Iterator[dict]:
         # Distinguish canonical-style (has "author_id"/"platform" fields)
         # from shortcut-style (raw Lark message shape under same key).
         inner = obj["messages"]
-        if inner and isinstance(inner[0], dict) and (
-            "author_id" in inner[0] or inner[0].get("platform") == "canonical"
+        if (
+            inner
+            and isinstance(inner[0], dict)
+            and ("author_id" in inner[0] or inner[0].get("platform") == "canonical")
         ):
             for item in inner:
                 if isinstance(item, dict):
@@ -446,7 +467,9 @@ def _dispatch_parsed_lark(obj: Any) -> Iterator[dict]:
     return
 
 
-def load_lark_export(path: Path, salt: str, channel: str | None = None) -> Iterator[Message]:
+def load_lark_export(
+    path: Path, salt: str, channel: str | None = None
+) -> Iterator[Message]:
     """Lark / Feishu `lark-cli im +chat-messages-list` (and related) output.
 
     Accepts NDJSON, JSON array, full response envelope, concatenated pages, or
@@ -505,9 +528,8 @@ def load_lark_export(path: Path, salt: str, channel: str | None = None) -> Itera
         reply_to_raw = m.get("reply_to")
         reply_to_from_shortcut = None
         if isinstance(reply_to_raw, dict):
-            reply_to_from_shortcut = (
-                reply_to_raw.get("message_id")
-                or reply_to_raw.get("id")
+            reply_to_from_shortcut = reply_to_raw.get("message_id") or reply_to_raw.get(
+                "id"
             )
         elif isinstance(reply_to_raw, str):
             reply_to_from_shortcut = reply_to_raw
@@ -529,7 +551,9 @@ def load_lark_export(path: Path, salt: str, channel: str | None = None) -> Itera
             message_id=str(m.get("message_id") or m.get("id") or ""),
             author_id=_hash_id(sender_id, salt),
             author_name=sender_name,
-            timestamp=_lark_timestamp(m.get("create_time") or m.get("created_time") or m.get("update_time")),
+            timestamp=_lark_timestamp(
+                m.get("create_time") or m.get("created_time") or m.get("update_time")
+            ),
             content=text,
             reply_to_message_id=str(reply_to) if reply_to else None,
             reactions=reactions,
@@ -568,6 +592,7 @@ def _parse_ts(s: str) -> datetime:
 # Stage 2 — language classification
 # ----------------------------------------------------------------------------
 
+
 def classify_language(text: str, language_profile: lang.LanguageProfile | None) -> str:
     """Return one of: 'target', 'other', 'mixed', 'unknown'.
 
@@ -594,6 +619,7 @@ def classify_language(text: str, language_profile: lang.LanguageProfile | None) 
 # Stage 3 — per-user profiles
 # ----------------------------------------------------------------------------
 
+
 @dataclass
 class UserProfile:
     user_id: str  # hashed
@@ -615,7 +641,9 @@ class UserProfile:
     friction: collections.Counter = field(default_factory=collections.Counter)
     shadow_community: collections.Counter = field(default_factory=collections.Counter)
     acquisition: collections.Counter = field(default_factory=collections.Counter)
-    impersonator_domains: collections.Counter = field(default_factory=collections.Counter)
+    impersonator_domains: collections.Counter = field(
+        default_factory=collections.Counter
+    )
     official_domains: collections.Counter = field(default_factory=collections.Counter)
     urls_posted: int = 0
     questions_asked: int = 0
@@ -647,6 +675,7 @@ class UserProfile:
 # Stage 4/5 — extraction
 # ----------------------------------------------------------------------------
 
+
 def extract_urls(text: str) -> list[str]:
     return kw.URL_PATTERN.findall(text)
 
@@ -669,17 +698,40 @@ def classify_url(url: str) -> tuple[str, str]:
     # Vendor domains associated with region-specific model providers (currently
     # covers the Chinese-market provider set; extend/edit for other regions).
     regional_vendor_domains = [
-        "volcengine.com", "bytedance.com", "deepseek.com", "moonshot.cn",
-        "kimi.cn", "zhipuai.cn", "bigmodel.cn", "aliyun.com", "bailian",
-        "minimaxi.com", "minimax.com", "baidu.com", "tencent.com",
-        "stepfun.com", "xiaomi.com", "yandex.ru", "yandex.com",
+        "volcengine.com",
+        "bytedance.com",
+        "deepseek.com",
+        "moonshot.cn",
+        "kimi.cn",
+        "zhipuai.cn",
+        "bigmodel.cn",
+        "aliyun.com",
+        "bailian",
+        "minimaxi.com",
+        "minimax.com",
+        "baidu.com",
+        "tencent.com",
+        "stepfun.com",
+        "xiaomi.com",
+        "yandex.ru",
+        "yandex.com",
     ]
     for d in regional_vendor_domains:
         if d in domain:
             return ("regional_vendor", domain)
-    messaging_domains = ["feishu.cn", "larksuite.com", "wechat.com", "weixin.qq",
-                          "dingtalk.com", "qq.com", "telegram.", "discord.",
-                          "vk.com", "line.me", "kakao.com"]
+    messaging_domains = [
+        "feishu.cn",
+        "larksuite.com",
+        "wechat.com",
+        "weixin.qq",
+        "dingtalk.com",
+        "qq.com",
+        "telegram.",
+        "discord.",
+        "vk.com",
+        "line.me",
+        "kakao.com",
+    ]
     for d in messaging_domains:
         if d in domain:
             return ("messaging", domain)
@@ -693,6 +745,7 @@ def is_question(text: str, question_pattern: re.Pattern) -> bool:
 # ----------------------------------------------------------------------------
 # Main pipeline
 # ----------------------------------------------------------------------------
+
 
 def run_pipeline(
     messages: list[Message],
@@ -712,7 +765,9 @@ def run_pipeline(
     """
     region_profile = region_profile or lang.get_region_profile("global")
     shadow_compiled = kw.compile_keyword_dict(region_profile.shadow_community)
-    question_pattern = kw.question_pattern_for(language_profile.code if language_profile else None)
+    question_pattern = kw.question_pattern_for(
+        language_profile.code if language_profile else None
+    )
 
     users: dict[str, UserProfile] = {}
     lang_counts = collections.Counter()
@@ -853,15 +908,23 @@ def run_pipeline(
                         break
 
     # Aggregate stats object
-    target_users = [u for u in users.values() if u.language_primary() in ("target_primary", "bilingual")]
-    target_primary_users = [u for u in users.values() if u.language_primary() == "target_primary"]
+    target_users = [
+        u
+        for u in users.values()
+        if u.language_primary() in ("target_primary", "bilingual")
+    ]
+    target_primary_users = [
+        u for u in users.values() if u.language_primary() == "target_primary"
+    ]
 
     # Retention cohorts
     now = max((m.timestamp for m in filtered), default=datetime.now(tz=timezone.utc))
     active_cutoff = now - timedelta(days=30)
     lapsed_cutoff = now - timedelta(days=90)
     active = [u for u in target_users if u.last_seen >= active_cutoff]
-    recently_lapsed = [u for u in target_users if active_cutoff > u.last_seen >= lapsed_cutoff]
+    recently_lapsed = [
+        u for u in target_users if active_cutoff > u.last_seen >= lapsed_cutoff
+    ]
     long_lapsed = [u for u in target_users if u.last_seen < lapsed_cutoff]
     one_time = [u for u in target_users if u.message_count == 1]
 
@@ -900,8 +963,12 @@ def run_pipeline(
             # Back-compat alias for the original Chinese-specific key name
             "channel_zh_message_counts": dict(channel_target_counts),
             "date_range": [
-                min((m.timestamp for m in filtered), default=None).isoformat() if filtered else None,
-                max((m.timestamp for m in filtered), default=None).isoformat() if filtered else None,
+                min((m.timestamp for m in filtered), default=None).isoformat()
+                if filtered
+                else None,
+                max((m.timestamp for m in filtered), default=None).isoformat()
+                if filtered
+                else None,
             ],
             "target_language": language_profile.code if language_profile else None,
             "target_language_name": language_profile.name if language_profile else None,
@@ -913,13 +980,21 @@ def run_pipeline(
         "users": {
             "total": len(users),
             "target_primary": len(target_primary_users),
-            "bilingual": sum(1 for u in users.values() if u.language_primary() == "bilingual"),
-            "other_primary": sum(1 for u in users.values() if u.language_primary() == "other_primary"),
-            "silent_or_unclassified": sum(1 for u in users.values() if u.language_primary() == "silent"),
+            "bilingual": sum(
+                1 for u in users.values() if u.language_primary() == "bilingual"
+            ),
+            "other_primary": sum(
+                1 for u in users.values() if u.language_primary() == "other_primary"
+            ),
+            "silent_or_unclassified": sum(
+                1 for u in users.values() if u.language_primary() == "silent"
+            ),
             "target_plus_bilingual": len(target_users),
             # Back-compat aliases (original Chinese-specific key names)
             "zh_primary": len(target_primary_users),
-            "en_primary": sum(1 for u in users.values() if u.language_primary() == "other_primary"),
+            "en_primary": sum(
+                1 for u in users.values() if u.language_primary() == "other_primary"
+            ),
             "zh_plus_bilingual": len(target_users),
         },
         "retention": {
@@ -952,21 +1027,25 @@ def run_pipeline(
             "total_questions": question_count,
             "target_questions": target_question_count,
             "target_questions_answered_within_48h": target_question_answered,
-            "target_answered_rate": (target_question_answered / target_question_count) if target_question_count else None,
+            "target_answered_rate": (target_question_answered / target_question_count)
+            if target_question_count
+            else None,
             # Back-compat aliases
             "zh_questions": target_question_count,
             "zh_questions_answered_within_48h": target_question_answered,
-            "zh_answered_rate": (target_question_answered / target_question_count) if target_question_count else None,
+            "zh_answered_rate": (target_question_answered / target_question_count)
+            if target_question_count
+            else None,
         },
     }
 
     return users, stats
 
 
-
 # ----------------------------------------------------------------------------
 # Report rendering — simple placeholder substitution
 # ----------------------------------------------------------------------------
+
 
 def render_report(template_path: Path, stats: dict[str, Any]) -> str:
     """Replace {{stats.foo.bar}} placeholders in template with values from stats.
@@ -986,7 +1065,7 @@ def render_report(template_path: Path, stats: dict[str, Any]) -> str:
         path = match.group(1).strip()
         if not path.startswith("stats."):
             return match.group(0)
-        parts = path[len("stats."):].split(".")
+        parts = path[len("stats.") :].split(".")
         cur: Any = stats
         try:
             for p in parts:
@@ -1013,6 +1092,7 @@ def render_report(template_path: Path, stats: dict[str, Any]) -> str:
 # Salt management
 # ----------------------------------------------------------------------------
 
+
 def ensure_salt(salt_path: Path) -> str:
     if salt_path.exists():
         return salt_path.read_text(encoding="utf-8").strip()
@@ -1028,31 +1108,67 @@ def ensure_salt(salt_path: Path) -> str:
 # CLI
 # ----------------------------------------------------------------------------
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Community chat-history analysis pipeline.")
-    parser.add_argument("--input", required=True, type=Path, help="Path to chat export JSON")
+    parser = argparse.ArgumentParser(
+        description="Community chat-history analysis pipeline."
+    )
+    parser.add_argument(
+        "--input", required=True, type=Path, help="Path to chat export JSON"
+    )
     parser.add_argument("--platform", required=True, choices=list(ADAPTERS.keys()))
-    parser.add_argument("--out", type=Path, default=Path("./out"), help="Output directory")
-    parser.add_argument("--target-language", type=str, default="zh",
-                        help="Language code to treat as the 'target' cohort for classification "
-                             "(see languages.py LANGUAGE_PROFILES for the full list: zh, ja, ko, "
-                             "ru, ar, he, th, vi, es, fr, de, pt, id, ...). "
-                             "Pass 'none' to disable language classification entirely — every "
-                             "message counts as target (useful for already-monolingual exports). "
-                             "Default: zh (backward-compatible with the original Chinese-focused build).")
-    parser.add_argument("--region", type=str, default="cn",
-                        help="Region code controlling shadow-community platforms and the "
-                             "timezone-proxy location buckets (see languages.py REGION_PROFILES: "
-                             "cn, jp, kr, ru, latam, mena, global, ...). Unknown codes fall back "
-                             "to 'global'. Default: cn (backward-compatible).")
-    parser.add_argument("--template", type=Path, default=Path(__file__).parent / "report-template.md")
-    parser.add_argument("--salt-file", type=Path, default=Path(__file__).parent / "user_hash_salt.key")
-    parser.add_argument("--channels", type=str, default=None, help="Comma-separated channel names to include")
-    parser.add_argument("--since", type=str, default=None, help="ISO date inclusive lower bound")
-    parser.add_argument("--until", type=str, default=None, help="ISO date inclusive upper bound")
-    parser.add_argument("--keep-names", action="store_true", help="Keep display names in users.json (default: redacted)")
-    parser.add_argument("--channel", type=str, default=None,
-                        help="Channel label override (lark adapter only; used when the export doesn't carry chat_name)")
+    parser.add_argument(
+        "--out", type=Path, default=Path("./out"), help="Output directory"
+    )
+    parser.add_argument(
+        "--target-language",
+        type=str,
+        default="zh",
+        help="Language code to treat as the 'target' cohort for classification "
+        "(see languages.py LANGUAGE_PROFILES for the full list: zh, ja, ko, "
+        "ru, ar, he, th, vi, es, fr, de, pt, id, ...). "
+        "Pass 'none' to disable language classification entirely — every "
+        "message counts as target (useful for already-monolingual exports). "
+        "Default: zh (backward-compatible with the original Chinese-focused build).",
+    )
+    parser.add_argument(
+        "--region",
+        type=str,
+        default="cn",
+        help="Region code controlling shadow-community platforms and the "
+        "timezone-proxy location buckets (see languages.py REGION_PROFILES: "
+        "cn, jp, kr, ru, latam, mena, global, ...). Unknown codes fall back "
+        "to 'global'. Default: cn (backward-compatible).",
+    )
+    parser.add_argument(
+        "--template", type=Path, default=Path(__file__).parent / "report-template.md"
+    )
+    parser.add_argument(
+        "--salt-file", type=Path, default=Path(__file__).parent / "user_hash_salt.key"
+    )
+    parser.add_argument(
+        "--channels",
+        type=str,
+        default=None,
+        help="Comma-separated channel names to include",
+    )
+    parser.add_argument(
+        "--since", type=str, default=None, help="ISO date inclusive lower bound"
+    )
+    parser.add_argument(
+        "--until", type=str, default=None, help="ISO date inclusive upper bound"
+    )
+    parser.add_argument(
+        "--keep-names",
+        action="store_true",
+        help="Keep display names in users.json (default: redacted)",
+    )
+    parser.add_argument(
+        "--channel",
+        type=str,
+        default=None,
+        help="Channel label override (lark adapter only; used when the export doesn't carry chat_name)",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -1060,14 +1176,20 @@ def main() -> int:
 
     language_profile = lang.get_language_profile(args.target_language)
     if args.target_language not in (None, "none", "off") and language_profile is None:
-        print(f"[warn] unknown --target-language '{args.target_language}'; "
-              f"known codes: {', '.join(sorted(lang.LANGUAGE_PROFILES))}. "
-              f"Falling back to no language classification.", file=sys.stderr)
+        print(
+            f"[warn] unknown --target-language '{args.target_language}'; "
+            f"known codes: {', '.join(sorted(lang.LANGUAGE_PROFILES))}. "
+            f"Falling back to no language classification.",
+            file=sys.stderr,
+        )
     region_profile = lang.get_region_profile(args.region)
     if args.region not in lang.REGION_PROFILES:
-        print(f"[warn] unknown --region '{args.region}'; "
-              f"known codes: {', '.join(sorted(lang.REGION_PROFILES))}. "
-              f"Falling back to 'global'.", file=sys.stderr)
+        print(
+            f"[warn] unknown --region '{args.region}'; "
+            f"known codes: {', '.join(sorted(lang.REGION_PROFILES))}. "
+            f"Falling back to 'global'.",
+            file=sys.stderr,
+        )
 
     salt = ensure_salt(args.salt_file)
     adapter = ADAPTERS[args.platform]
@@ -1078,12 +1200,28 @@ def main() -> int:
         messages = list(adapter(args.input, salt))
 
     if args.verbose:
-        print(f"[load] {len(messages)} messages from {args.platform} export", file=sys.stderr)
-        print(f"[config] target_language={args.target_language} region={args.region}", file=sys.stderr)
+        print(
+            f"[load] {len(messages)} messages from {args.platform} export",
+            file=sys.stderr,
+        )
+        print(
+            f"[config] target_language={args.target_language} region={args.region}",
+            file=sys.stderr,
+        )
 
-    channels_filter = {c.strip() for c in args.channels.split(",")} if args.channels else None
-    since = datetime.fromisoformat(args.since).replace(tzinfo=timezone.utc) if args.since else None
-    until = datetime.fromisoformat(args.until).replace(tzinfo=timezone.utc) if args.until else None
+    channels_filter = (
+        {c.strip() for c in args.channels.split(",")} if args.channels else None
+    )
+    since = (
+        datetime.fromisoformat(args.since).replace(tzinfo=timezone.utc)
+        if args.since
+        else None
+    )
+    until = (
+        datetime.fromisoformat(args.until).replace(tzinfo=timezone.utc)
+        if args.until
+        else None
+    )
 
     users, stats = run_pipeline(
         messages,
@@ -1095,10 +1233,11 @@ def main() -> int:
         region_profile=region_profile,
     )
 
-
     # Write stats.json
     stats_path = args.out / "stats.json"
-    stats_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
+    stats_path.write_text(
+        json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"[write] {stats_path}", file=sys.stderr)
 
     # Write users.json (redacted by default)
@@ -1107,8 +1246,18 @@ def main() -> int:
         d = asdict(u)
         d["channels"] = sorted(u.channels)
         d["hours_of_day"] = dict(u.hours_of_day)
-        for key in ("providers", "competitors", "messaging", "features", "install", "friction",
-                    "shadow_community", "acquisition", "impersonator_domains", "official_domains"):
+        for key in (
+            "providers",
+            "competitors",
+            "messaging",
+            "features",
+            "install",
+            "friction",
+            "shadow_community",
+            "acquisition",
+            "impersonator_domains",
+            "official_domains",
+        ):
             d[key] = dict(getattr(u, key))
         d["first_seen"] = u.first_seen.isoformat()
         d["last_seen"] = u.last_seen.isoformat()
@@ -1117,7 +1266,9 @@ def main() -> int:
             d["display_name"] = "<redacted>"
         users_serializable[uid] = d
     users_path = args.out / "users.json"
-    users_path.write_text(json.dumps(users_serializable, ensure_ascii=False, indent=2), encoding="utf-8")
+    users_path.write_text(
+        json.dumps(users_serializable, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"[write] {users_path}", file=sys.stderr)
 
     # Write report
@@ -1127,7 +1278,10 @@ def main() -> int:
         report_path.write_text(report_md, encoding="utf-8")
         print(f"[write] {report_path}", file=sys.stderr)
     else:
-        print(f"[warn] template not found at {args.template}; skipping report rendering", file=sys.stderr)
+        print(
+            f"[warn] template not found at {args.template}; skipping report rendering",
+            file=sys.stderr,
+        )
 
     print("[done] Analysis complete.", file=sys.stderr)
     return 0

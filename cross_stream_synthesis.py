@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Cross-stream synthesis: feed A+B+C+D outputs into MiMo v2.5-Pro and produce findings_final.md."""
+
 import json
 import os
 import subprocess
-from pathlib import Path
 from collections import Counter
+from pathlib import Path
 
 BASE = Path(os.environ.get("OUT_DIR", "./out"))
 OUT = BASE / "findings_final_v2.md"
@@ -24,7 +25,7 @@ stats = json.load((BASE / "stats.json").open())
 # Topic distribution
 topic_counts = Counter(topics.values())
 total_tagged = sum(topic_counts.values())
-topic_pcts = {k: (v, round(100*v/total_tagged, 1)) for k, v in topic_counts.items()}
+topic_pcts = {k: (v, round(100 * v / total_tagged, 1)) for k, v in topic_counts.items()}
 
 # Build compact context for the LLM — stay under ~25K chars for safety
 #
@@ -62,19 +63,31 @@ community talks about, with no strategic recommendations layered in at this stag
 for qname, f in stream_b_findings.items():
     context += f"\n[{qname}] query: {f['query']}\n{f['analysis'][:900]}\n"
 
-context += "\n\n=== STREAM C: STRUCTURED FACT EXTRACTION (6,571 facts across 244 chunks) ===\n"
+context += (
+    "\n\n=== STREAM C: STRUCTURED FACT EXTRACTION (6,571 facts across 244 chunks) ===\n"
+)
 context += json.dumps(stream_c_summary, ensure_ascii=False, indent=1)[:5000]
 
 # A few exemplar facts per category so MiMo has concrete texture
 import random
+
 random.seed(42)
 context += "\n\nExemplar facts (randomly sampled, truncated):\n"
 for cat, items in stream_c_facts.items():
-    if not items: continue
+    if not items:
+        continue
     samples = random.sample(items, min(5, len(items)))
     context += f"\n--- {cat} ---\n"
     for s in samples:
-        d = {k: (str(v)[:80] if not isinstance(v, list) else ','.join(str(x) for x in v)[:80]) for k, v in s.items() if k != '_chunk_idx'}
+        d = {
+            k: (
+                str(v)[:80]
+                if not isinstance(v, list)
+                else ",".join(str(x) for x in v)[:80]
+            )
+            for k, v in s.items()
+            if k != "_chunk_idx"
+        }
         context += json.dumps(d, ensure_ascii=False) + "\n"
 
 context += f"""
@@ -96,32 +109,36 @@ Human poster stickiness:
   - One-time posters: 186 (21.2% of posters)
 
 Message concentration (human posters over human messages):
-{json.dumps(stream_d_pareto['human_concentration'], ensure_ascii=False, indent=1)}
+{json.dumps(stream_d_pareto["human_concentration"], ensure_ascii=False, indent=1)}
 
 As % of 3,119 humans:
-{json.dumps(stream_d_pareto['human_concentration_of_membership'], ensure_ascii=False, indent=1)}
+{json.dumps(stream_d_pareto["human_concentration_of_membership"], ensure_ascii=False, indent=1)}
 
 Gateway URL Mix (distinct URL mentions):
-{json.dumps(stream_d_gateway['url_mentions_by_gateway'], ensure_ascii=False, indent=1)}
+{json.dumps(stream_d_gateway["url_mentions_by_gateway"], ensure_ascii=False, indent=1)}
 
 Reply Graph:
-- Messages with reply_to: {stream_d_reply['total_messages_with_reply_to']:,}
-- Distinct threads: {stream_d_reply['distinct_threads']:,}
-- Threads with 5+ replies: {stream_d_reply['threads_with_5plus_replies']}
-- Threads with 10+ replies: {stream_d_reply['threads_with_10plus_replies']}
+- Messages with reply_to: {stream_d_reply["total_messages_with_reply_to"]:,}
+- Distinct threads: {stream_d_reply["distinct_threads"]:,}
+- Threads with 5+ replies: {stream_d_reply["threads_with_5plus_replies"]}
+- Threads with 10+ replies: {stream_d_reply["threads_with_10plus_replies"]}
 
 Temporal growth (first 5, peak day, last 3):
 """
-peak_join = max(stream_d_temporal, key=lambda x: x['new_members_joined'])
-context += json.dumps(stream_d_temporal[:5] + [peak_join] + stream_d_temporal[-3:], ensure_ascii=False, indent=1)
+peak_join = max(stream_d_temporal, key=lambda x: x["new_members_joined"])
+context += json.dumps(
+    stream_d_temporal[:5] + [peak_join] + stream_d_temporal[-3:],
+    ensure_ascii=False,
+    indent=1,
+)
 
 context += f"""
 
 === AGGREGATE STATS FROM ORIGINAL PIPELINE ===
-- Total messages: {stats['metadata']['total_messages']:,}
-- Language distribution: {stats.get('language_distribution', {})}
-- Location proxy: {stats.get('location_proxy', {})}
-- Help-answered rate (ZH, threaded 48h): {stats.get('help_answered', {}).get('zh_answered_rate', 'n/a')}
+- Total messages: {stats["metadata"]["total_messages"]:,}
+- Language distribution: {stats.get("language_distribution", {})}
+- Location proxy: {stats.get("location_proxy", {})}
+- Help-answered rate (ZH, threaded 48h): {stats.get("help_answered", {}).get("zh_answered_rate", "n/a")}
 
 === YOUR TASK ===
 
@@ -154,22 +171,36 @@ Rules:
 print(f"Context size: {len(context):,} chars", flush=True)
 
 # Call the configured LLM (pro/stronger variant recommended for this step)
-cmd = ["hermes", "chat", "-q", context, "--quiet", "--ignore-rules", "--ignore-user-config",
-       "--max-turns", "1", "--source", "tool",
-       "--provider", os.environ.get("LLM_PROVIDER", "nous"),
-       "--model", os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro")]
+cmd = [
+    "hermes",
+    "chat",
+    "-q",
+    context,
+    "--quiet",
+    "--ignore-rules",
+    "--ignore-user-config",
+    "--max-turns",
+    "1",
+    "--source",
+    "tool",
+    "--provider",
+    os.environ.get("LLM_PROVIDER", "nous"),
+    "--model",
+    os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro"),
+]
 
 print("Calling LLM for synthesis...", flush=True)
 import time
+
 t0 = time.time()
 r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)
 elapsed = time.time() - t0
 print(f"Got response in {elapsed:.0f}s ({len(r.stdout):,} chars)", flush=True)
 
 out = r.stdout
-lines = [l for l in out.split('\n') if not l.startswith('session_id:')]
-clean = '\n'.join(lines).strip()
+lines = [l for l in out.split("\n") if not l.startswith("session_id:")]
+clean = "\n".join(lines).strip()
 
 # Write
-OUT.write_text(clean, encoding='utf-8')
+OUT.write_text(clean, encoding="utf-8")
 print(f"Wrote {OUT} ({OUT.stat().st_size // 1024} KB)", flush=True)

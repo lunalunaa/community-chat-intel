@@ -17,6 +17,7 @@ since those genuinely vary by target region.
 """
 
 from __future__ import annotations
+
 import re
 
 # ----------------------------------------------------------------------------
@@ -92,7 +93,12 @@ PRODUCT_FEATURES: dict[str, list[str]] = {
     "memory": ["memory", "记忆", "持久化", "persistent memory"],
     "cron": ["cron", "cronjob", "定时任务", "scheduled task"],
     "delegate": ["delegate_task", "subagent", "子任务", "委派"],
-    "browser": ["browser_navigate", "browser_click", "browser automation", "浏览器自动化"],
+    "browser": [
+        "browser_navigate",
+        "browser_click",
+        "browser automation",
+        "浏览器自动化",
+    ],
     "vision": ["vision_analyze", "视觉", "image analysis"],
     "tts": ["text_to_speech", "tts", "语音合成"],
     "mcp": ["mcp", "mcp server", "model context protocol"],
@@ -191,10 +197,18 @@ QUESTION_PATTERNS_BY_LANGUAGE: dict[str, re.Pattern] = {
     "ja": re.compile(r"[？?]\s*$|どう|なぜ|何|ですか\s*[？?]?\s*$|ますか\s*[？?]?\s*$"),
     "ko": re.compile(r"[？?]\s*$|어떻게|왜|무엇|인가요\s*[？?]?\s*$|나요\s*[？?]?\s*$"),
     "ru": re.compile(r"[?]\s*$|как\b|почему\b|что\b|где\b|можно ли\b", re.IGNORECASE),
-    "es": re.compile(r"[?¿]\s*$|\bcómo\b|\bqué\b|\bpor qué\b|\bcuándo\b|\bdónde\b", re.IGNORECASE),
-    "fr": re.compile(r"[?]\s*$|\bcomment\b|\bpourquoi\b|\bquoi\b|\bquand\b|\boù\b", re.IGNORECASE),
-    "de": re.compile(r"[?]\s*$|\bwie\b|\bwarum\b|\bwas\b|\bwann\b|\bwo\b", re.IGNORECASE),
-    "pt": re.compile(r"[?]\s*$|\bcomo\b|\bpor que\b|\bquando\b|\bonde\b", re.IGNORECASE),
+    "es": re.compile(
+        r"[?¿]\s*$|\bcómo\b|\bqué\b|\bpor qué\b|\bcuándo\b|\bdónde\b", re.IGNORECASE
+    ),
+    "fr": re.compile(
+        r"[?]\s*$|\bcomment\b|\bpourquoi\b|\bquoi\b|\bquand\b|\boù\b", re.IGNORECASE
+    ),
+    "de": re.compile(
+        r"[?]\s*$|\bwie\b|\bwarum\b|\bwas\b|\bwann\b|\bwo\b", re.IGNORECASE
+    ),
+    "pt": re.compile(
+        r"[?]\s*$|\bcomo\b|\bpor que\b|\bquando\b|\bonde\b", re.IGNORECASE
+    ),
     "ar": re.compile(r"[؟?]\s*$|كيف|لماذا|ماذا|متى|أين"),
 }
 
@@ -217,6 +231,7 @@ def question_pattern_for(language_code: str | None) -> re.Pattern:
 # a language code.
 QUESTION_PATTERN = question_pattern_for("zh")
 
+
 # ----------------------------------------------------------------------------
 # Compile helpers
 # ----------------------------------------------------------------------------
@@ -235,7 +250,9 @@ def _compile_dict(d: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
                 compiled_patterns.append(re.compile(re.escape(p), re.IGNORECASE))
             else:
                 # ASCII — word boundary
-                compiled_patterns.append(re.compile(rf"(?<!\w){re.escape(p)}(?!\w)", re.IGNORECASE))
+                compiled_patterns.append(
+                    re.compile(rf"(?<!\w){re.escape(p)}(?!\w)", re.IGNORECASE)
+                )
         compiled[label] = compiled_patterns
     return compiled
 
@@ -262,4 +279,3 @@ def match_any(text: str, compiled: dict[str, list[re.Pattern]]) -> list[str]:
                 hits.append(label)
                 break
     return hits
-
