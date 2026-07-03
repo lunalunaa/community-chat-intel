@@ -20,6 +20,14 @@ CHAT_JSONL = Path(os.environ.get("CHAT_JSONL", "./data/pages.jsonl"))
 OUT_DIR = Path(os.environ.get("OUT_DIR", "./out/stream_c"))
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Target language, used only to phrase the extraction prompt below (does not
+# affect which messages get chunked/extracted — this stream processes all
+# non-system messages regardless of language).
+TARGET_LANGUAGE = os.environ.get("TARGET_LANGUAGE", "zh")
+TARGET_LANGUAGE_NAME = {"zh": "Chinese", "en": "English"}.get(
+    TARGET_LANGUAGE, TARGET_LANGUAGE
+)
+
 SALT_FILE = Path(os.environ.get("SALT_FILE", "./user_hash_salt.key"))
 SALT = SALT_FILE.read_text().strip() if SALT_FILE.exists() else "default-salt"
 
@@ -30,14 +38,21 @@ def hash_user(uid):
     return "u_" + hashlib.sha256((SALT + uid).encode()).hexdigest()[:12]
 
 
-CHINA_TZ = timezone(timedelta(hours=8))
+# Timestamp parsing assumes a fixed UTC offset for "YYYY-MM-DD HH:MM"
+# display-format timestamps some export tools emit without a tz marker.
+# Defaults to +8 (China Standard Time) for backward compatibility with the
+# original Feishu-export worked example; set TS_UTC_OFFSET_HOURS to your
+# own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
+DISPLAY_TS_TZ = timezone(
+    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
+)
 
 
 def parse_ts(s):
     if isinstance(s, str) and re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}", s):
         return (
             datetime.strptime(s, "%Y-%m-%d %H:%M")
-            .replace(tzinfo=CHINA_TZ)
+            .replace(tzinfo=DISPLAY_TS_TZ)
             .astimezone(timezone.utc)
         )
     return None
@@ -79,8 +94,12 @@ CHUNK_SIZE = 100
 chunks = [messages[i : i + CHUNK_SIZE] for i in range(0, len(messages), CHUNK_SIZE)]
 print(f"[stream_c] {len(chunks)} chunks of ≤{CHUNK_SIZE} messages", flush=True)
 
-EXTRACTION_PROMPT = """You are analyzing a chunk of chat messages from a product's community chat (Chinese-language, on a Feishu-style platform). Extract structured facts. Output a single valid JSON object matching this schema (omit arrays that have no instances):
-
+EXTRACTION_PROMPT = (
+    f"You are analyzing a chunk of chat messages from a product's community chat "
+    f"({TARGET_LANGUAGE_NAME}-language, on a chat platform). Extract structured "
+    "facts. Output a single valid JSON object matching this schema (omit arrays "
+    "that have no instances):\n"
+    + """
 {
   "install_problems": [{"user_ref": "a short tag like 'user_A' or actual @name", "problem": "what broke", "os_or_context": "optional", "resolved": true/false/null}],
   "provider_usage": [{"user_ref": "...", "provider_or_gateway": "hosted_service | openrouter | direct_kimi | direct_minimax | direct_glm | direct_volcengine | direct_deepseek | direct_qwen | proxy_reseller | self_hosted | anthropic | openai | other", "sentiment": "positive | negative | neutral", "quoted_context": "short"}],
@@ -103,6 +122,7 @@ Rules:
 
 MESSAGES:
 """
+)
 
 
 def format_chunk(chunk):

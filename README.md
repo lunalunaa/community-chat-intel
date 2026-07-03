@@ -143,6 +143,8 @@ All stream scripts (`semantic_retrieval.py`, `fact_extraction.py`, `fact_extract
 | `CHAT_JSONL` | Path to the raw NDJSON export | `./data/pages.jsonl` |
 | `OUT_DIR` | Output directory for all streams | `./out` |
 | `SALT_FILE` | User-ID hashing salt (auto-generate with `chatintel-analyze` on first run) | `./user_hash_salt.key` |
+| `TARGET_LANGUAGE` | Which `QUERIES_BY_LANGUAGE` set `semantic_retrieval.py` runs, and how the LLM prompts in `semantic_retrieval.py`/`fact_extraction.py`/`fact_extraction_retry.py` describe the corpus's language | `zh` (also ships an `en` example set; add your own entry for other languages) |
+| `TS_UTC_OFFSET_HOURS` | UTC offset (hours) used to parse `"YYYY-MM-DD HH:MM"`-style display timestamps that lack a timezone marker, in `semantic_retrieval.py`/`fact_extraction.py`/`fact_extraction_retry.py`/`deterministic_analytics.py` | `8` (China Standard Time, for backward compatibility with the original Feishu-export example; set `0` for UTC, `9` for Japan/Korea, etc.) |
 | `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` | Manually-verified live membership (`deterministic_analytics.py` denominator) | `0` (must be set for meaningful output) |
 | `GROUND_TRUTH_SOURCE` | Free-text provenance note for the ground-truth numbers | `"platform admin UI, manually verified"` |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_MODEL_PRO` | Which provider/model your LLM CLI should use | `nous` / `xiaomi/mimo-v2.5` / `xiaomi/mimo-v2.5-pro` (example — use whatever you have configured) |

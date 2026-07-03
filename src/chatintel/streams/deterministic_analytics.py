@@ -41,14 +41,21 @@ def hash_user(label):
     )
 
 
-CHINA_TZ = timezone(timedelta(hours=8))
+# Timestamp parsing assumes a fixed UTC offset for "YYYY-MM-DD HH:MM"
+# display-format timestamps some export tools emit without a tz marker.
+# Defaults to +8 (China Standard Time) for backward compatibility with the
+# original Feishu-export worked example; set TS_UTC_OFFSET_HOURS to your
+# own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
+DISPLAY_TS_TZ = timezone(
+    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
+)
 
 
 def parse_ts(s):
     if isinstance(s, str) and re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}", s):
         return (
             datetime.strptime(s, "%Y-%m-%d %H:%M")
-            .replace(tzinfo=CHINA_TZ)
+            .replace(tzinfo=DISPLAY_TS_TZ)
             .astimezone(timezone.utc)
         )
     return None

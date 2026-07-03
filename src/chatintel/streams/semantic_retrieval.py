@@ -4,6 +4,12 @@
 Embeds all non-system messages with a multilingual model, builds a FAISS index,
 runs structured retrieval queries, feeds top-K results to an LLM for synthesis.
 
+Set TARGET_LANGUAGE to pick which QUERIES_BY_LANGUAGE example set to run
+(defaults to "zh" for backward compatibility with the original worked
+example; "en" is also provided — add your own entry for other languages).
+Set TS_UTC_OFFSET_HOURS if your export's display-format timestamps are in
+local time other than China Standard Time (the default).
+
 Uses local sentence-transformers (no API) for embeddings; the LLM synthesis
 step shells out to `hermes chat -q` so any configured provider/model works —
 override via LLM_PROVIDER / LLM_MODEL env vars (defaults shown are just an
@@ -21,24 +27,40 @@ CHAT_JSONL = Path(os.environ.get("CHAT_JSONL", "./data/pages.jsonl"))
 OUT_DIR = Path(os.environ.get("OUT_DIR", "./out/stream_b"))
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Target language for the QUERIES set below and the LLM synthesis prompt.
+# Defaults to "zh" for backward compatibility with the original worked
+# example. Set to any languages.py LANGUAGE_PROFILES code, or add your own
+# entry to QUERIES_BY_LANGUAGE.
+TARGET_LANGUAGE = os.environ.get("TARGET_LANGUAGE", "zh")
+TARGET_LANGUAGE_NAME = {"zh": "Chinese", "en": "English"}.get(
+    TARGET_LANGUAGE, TARGET_LANGUAGE
+)
+
+# Timestamp parsing assumes a fixed UTC offset for the "YYYY-MM-DD HH:MM"
+# display-format timestamps some export tools emit without a tz marker.
+# Defaults to +8 (China Standard Time) for backward compatibility with the
+# original Feishu-export worked example; set TS_UTC_OFFSET_HOURS to your
+# own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
+TS_UTC_OFFSET_HOURS = float(os.environ.get("TS_UTC_OFFSET_HOURS", "8"))
+
 print("[stream_b] loading sentence-transformers...", flush=True)
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "BAAI/bge-m3"  # best multilingual, supports zh/en dense retrieval
+MODEL_NAME = "BAAI/bge-m3"  # multilingual, supports 100+ languages for dense retrieval
 print(f"[stream_b] loading model: {MODEL_NAME}", flush=True)
 model = SentenceTransformer(MODEL_NAME)
 
 # ===== Load and prep messages =====
-CHINA_TZ = timezone(timedelta(hours=8))
+DISPLAY_TS_TZ = timezone(timedelta(hours=TS_UTC_OFFSET_HOURS))
 
 
 def parse_ts(s):
     if isinstance(s, str) and re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}", s):
         return (
             datetime.strptime(s, "%Y-%m-%d %H:%M")
-            .replace(tzinfo=CHINA_TZ)
+            .replace(tzinfo=DISPLAY_TS_TZ)
             .astimezone(timezone.utc)
         )
     return None
@@ -119,36 +141,74 @@ index = faiss.IndexFlatIP(
 index.add(embs.astype("float32"))
 
 # ===== Retrieval queries =====
-# Structured queries — EXAMPLE set for a generic AI-agent product. Replace the
-# product name / feature names / competitor names with your own; the query
-# *shape* (feature-adapter demand, gateway-vs-direct-API usage, brand
-# confusion, pricing complaints, VPN friction, competitor comparison) is the
-# reusable part.
-QUERIES = {
-    # Messaging-adapter demand
-    "feishu_adapter_demand": "想要把这个产品接入飞书机器人，飞书 webhook，飞书对接",
-    "feishu_actively_building": "我正在开发飞书集成，我写了一个飞书 adapter",
-    "wechat_adapter_demand": "能不能接入微信，微信机器人，企业微信",
-    "dingtalk_adapter_demand": "钉钉机器人，钉钉对接",
-    # Gateway / hosted vs direct API
-    "hosted_service_usage": "我在用官方托管服务，额度，门户",
-    "direct_vendor_api_usage": "我直接用 kimi API，minimax API key，直接调 deepseek",
-    "openrouter_usage": "openrouter 更便宜，通过 openrouter 用",
-    "agent_key_sharing": "大家分享一下 sk-key，谁有 API key 能借用，合租",
-    # Topic texture
-    "install_friction": "安装不上，报错，无法运行，docker 启动失败",
-    "brand_identity_confusion": "这是官方吗，是真的假的，哪个是官方网站",
-    "pricing_complaints": "太贵了，免费额度用完，信用卡支付不了，限额",
-    "vpn_friction": "被墙了，没法访问，需要翻墙，国内用不了",
-    "success_stories": "我用这个做了，搭建了个智能体，跑起来了",
-    "feature_requests": "希望能加上，我想要一个功能，建议增加",
-    "core_feature_usage": "skill memory cron 怎么用，如何创建 skill",
-    # Competitor sentiment
-    "comparison_with_competitors": "对比竞品A, 比竞品B好，和竞品C区别",
-    "comparison_with_alt_tools": "比claude code好，比codex强，比cursor",
-    # Community hubs
-    "mentions_of_external_communities": "我的微信公众号，关注我的知乎，B站视频教程",
+# Structured queries, keyed by target language. Each language's query set is
+# an EXAMPLE for a generic AI-agent product — replace the product name /
+# feature names / competitor names with your own. The query *shape*
+# (feature-adapter demand, gateway-vs-direct-API usage, brand confusion,
+# pricing complaints, network friction, competitor comparison) is the
+# reusable part; write your own query text in whichever language your
+# community actually uses (set TARGET_LANGUAGE / QUERIES_BY_LANGUAGE below).
+QUERIES_BY_LANGUAGE: dict[str, dict[str, str]] = {
+    "zh": {
+        # Messaging-adapter demand
+        "feishu_adapter_demand": "想要把这个产品接入飞书机器人，飞书 webhook，飞书对接",
+        "feishu_actively_building": "我正在开发飞书集成，我写了一个飞书 adapter",
+        "wechat_adapter_demand": "能不能接入微信，微信机器人，企业微信",
+        "dingtalk_adapter_demand": "钉钉机器人，钉钉对接",
+        # Gateway / hosted vs direct API
+        "hosted_service_usage": "我在用官方托管服务，额度，门户",
+        "direct_vendor_api_usage": "我直接用 kimi API，minimax API key，直接调 deepseek",
+        "openrouter_usage": "openrouter 更便宜，通过 openrouter 用",
+        "agent_key_sharing": "大家分享一下 sk-key，谁有 API key 能借用，合租",
+        # Topic texture
+        "install_friction": "安装不上，报错，无法运行，docker 启动失败",
+        "brand_identity_confusion": "这是官方吗，是真的假的，哪个是官方网站",
+        "pricing_complaints": "太贵了，免费额度用完，信用卡支付不了，限额",
+        "vpn_friction": "被墙了，没法访问，需要翻墙，国内用不了",
+        "success_stories": "我用这个做了，搭建了个智能体，跑起来了",
+        "feature_requests": "希望能加上，我想要一个功能，建议增加",
+        "core_feature_usage": "skill memory cron 怎么用，如何创建 skill",
+        # Competitor sentiment
+        "comparison_with_competitors": "对比竞品A, 比竞品B好，和竞品C区别",
+        "comparison_with_alt_tools": "比claude code好，比codex强，比cursor",
+        # Community hubs
+        "mentions_of_external_communities": "我的微信公众号，关注我的知乎，B站视频教程",
+    },
+    "en": {
+        # Messaging-adapter demand
+        "slack_adapter_demand": "wants to connect this product to Slack, Slack webhook, Slack integration",
+        "slack_actively_building": "I'm building a Slack integration, I wrote a Slack adapter",
+        "discord_adapter_demand": "can you add Discord support, Discord bot integration",
+        "teams_adapter_demand": "Microsoft Teams bot, Teams integration",
+        # Gateway / hosted vs direct API
+        "hosted_service_usage": "using the official hosted service, credits, portal",
+        "direct_vendor_api_usage": "using the OpenAI API directly, Anthropic API key, calling Claude directly",
+        "openrouter_usage": "OpenRouter is cheaper, going through OpenRouter",
+        "agent_key_sharing": "sharing an sk- key, does anyone have a spare API key, splitting a subscription",
+        # Topic texture
+        "install_friction": "can't install, error, won't run, docker fails to start",
+        "brand_identity_confusion": "is this official, is this a scam, which is the real website",
+        "pricing_complaints": "too expensive, ran out of free credits, card declined, rate limited",
+        "network_friction": "blocked in my country, can't access, need a VPN, region-locked",
+        "success_stories": "I built this with it, set up an agent, got it running",
+        "feature_requests": "wish it had, I want a feature where, would be great if",
+        "core_feature_usage": "how do I use skills memory cron, how to create a skill",
+        # Competitor sentiment
+        "comparison_with_competitors": "compared to Competitor A, better than Competitor B, vs Competitor C",
+        "comparison_with_alt_tools": "better than Claude Code, stronger than Codex, vs Cursor",
+        # Community hubs
+        "mentions_of_external_communities": "my newsletter, follow me on Reddit, YouTube tutorial",
+    },
 }
+
+QUERIES = QUERIES_BY_LANGUAGE.get(TARGET_LANGUAGE, QUERIES_BY_LANGUAGE["en"])
+if TARGET_LANGUAGE not in QUERIES_BY_LANGUAGE:
+    print(
+        f"[stream_b] no QUERIES set for TARGET_LANGUAGE={TARGET_LANGUAGE!r}; "
+        f"falling back to the 'en' example set. Add your own entry to "
+        f"QUERIES_BY_LANGUAGE for a language-native query set.",
+        flush=True,
+    )
 
 print(f"[stream_b] running {len(QUERIES)} retrieval queries", flush=True)
 TOP_K = 30
@@ -187,14 +247,15 @@ for query_name, query_text in QUERIES.items():
 )
 print(f"[stream_b] retrieval done → {OUT_DIR / 'retrieval_results.json'}", flush=True)
 
-# ===== Kimi K2.6 synthesis for each query =====
+# ===== LLM synthesis for each query =====
 print()
-print("[stream_b] synthesizing findings with MiMo v2.5...", flush=True)
+print("[stream_b] synthesizing findings with your configured LLM...", flush=True)
 
 findings = {}
 for query_name, data in retrieval_out.items():
     prompt_lines = [
-        "You are analyzing a Chinese AI community chat. Below are the 30 most-relevant messages for this research query:",
+        f"You are analyzing a {TARGET_LANGUAGE_NAME}-language AI-product community chat. "
+        f"Below are the {TOP_K} most-relevant messages for this research query:",
         f"QUERY: {query_name}",
         f"QUERY_TEXT: {data['query']}",
         "",
