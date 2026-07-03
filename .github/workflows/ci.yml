@@ -44,9 +44,9 @@ jobs:
       - run: uv pip install -e .
       - name: Verify console scripts
         run: |
-          chatintel-analyze --help | head -1
-          chatintel-topics --help | head -1
-          chatintel-crosstabs --help | head -1
+          uv run chatintel-analyze --help | head -1
+          uv run chatintel-topics --help | head -1
+          uv run chatintel-crosstabs --help | head -1
       - name: Smoke-test pipeline on synthetic data
         run: |
           mkdir -p /tmp/ci-smoke
@@ -69,9 +69,9 @@ jobs:
           }
           json.dump(export, open('export.json', 'w'), ensure_ascii=False)
           "
-          chatintel-analyze --input export.json --platform discord --out ./out -v
-          chatintel-crosstabs --users-json ./out/users.json --out ./out/crosstabs.json
-          chatintel-topics --input-chat export.json --platform discord --dry-run \
+          uv run chatintel-analyze --input export.json --platform discord --out ./out -v
+          uv run chatintel-crosstabs --users-json ./out/users.json --out ./out/crosstabs.json
+          uv run chatintel-topics --input-chat export.json --platform discord --dry-run \
               --out ./out/topics.json --stats-path ./out/stats.json
           test -f ./out/report.md
           test -f ./out/stats.json
