@@ -1,88 +1,88 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  lint:
-    name: Lint (ruff)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v8
-      - run: uv python install 3.12
-      - run: uv venv
-      - run: uv pip install ruff
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+    lint:
+        name: Lint (ruff)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+            - uses: astral-sh/setup-uv@v8.2.0
+            - run: uv python install 3.12
+            - run: uv venv
+            - run: uv pip install ruff
+            - run: uv run ruff check .
+            - run: uv run ruff format --check .
 
-  typecheck:
-    name: Type-check (basedpyright)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v8
-      - run: uv python install 3.12
-      - run: uv venv
-      - run: uv pip install -e . basedpyright
-      - run: uv run basedpyright
+    typecheck:
+        name: Type-check (basedpyright)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+            - uses: astral-sh/setup-uv@v8.2.0
+            - run: uv python install 3.12
+            - run: uv venv
+            - run: uv pip install -e . basedpyright
+            - run: uv run basedpyright
 
-  build:
-    name: Build & verify package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v8
-      - run: uv python install 3.12
-      - run: uv venv
-      - run: uv pip install -e .
-      - name: Verify console scripts
-        run: |
-          uv run chatintel-analyze --help | head -1
-          uv run chatintel-topics --help | head -1
-          uv run chatintel-crosstabs --help | head -1
-      - name: Smoke-test pipeline on synthetic data
-        working-directory: ${{ github.workspace }}
-        run: |
-          mkdir -p /tmp/ci-smoke
-          python3 -c "
-          import json
-          export = {
-              'guild': {'name': 'g'},
-              'channel': {'id': '1', 'name': 'general'},
-              'messages': [
-                  {'id': '1', 'author': {'id': 'u1', 'name': 'a'},
-                   'timestamp': '2026-01-01T12:00:00+00:00',
-                   'content': '怎么安装这个？报错了',
-                   'reactions': [], 'attachments': []},
-                  {'id': '2', 'author': {'id': 'u2', 'name': 'b'},
-                   'timestamp': '2026-01-01T12:05:00+00:00',
-                   'content': '用 deepseek 试试，挺好的',
-                   'reactions': [], 'attachments': []},
-              ],
-          }
-          json.dump(export, open('/tmp/ci-smoke/export.json', 'w'), ensure_ascii=False)
-          "
-          uv run chatintel-analyze --input /tmp/ci-smoke/export.json --platform discord --out /tmp/ci-smoke/out -v
-          uv run chatintel-crosstabs --users-json /tmp/ci-smoke/out/users.json --out /tmp/ci-smoke/out/crosstabs.json
-          uv run chatintel-topics --input-chat /tmp/ci-smoke/export.json --platform discord --dry-run \
-              --out /tmp/ci-smoke/out/topics.json --stats-path /tmp/ci-smoke/out/stats.json
-          test -f /tmp/ci-smoke/out/report.md
-          test -f /tmp/ci-smoke/out/stats.json
-          test -f /tmp/ci-smoke/out/users.json
-          test -f /tmp/ci-smoke/out/crosstabs.json
-          test -f /tmp/ci-smoke/out/topics.json
-          echo "=== smoke test passed ==="
-      - name: Build sdist + wheel
-        run: uv build
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: dist
-          path: dist/
+    build:
+        name: Build & verify package
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+            - uses: astral-sh/setup-uv@v8.2.0
+            - run: uv python install 3.12
+            - run: uv venv
+            - run: uv pip install -e .
+            - name: Verify console scripts
+              run: |
+                  uv run chatintel-analyze --help | head -1
+                  uv run chatintel-topics --help | head -1
+                  uv run chatintel-crosstabs --help | head -1
+            - name: Smoke-test pipeline on synthetic data
+              working-directory: ${{ github.workspace }}
+              run: |
+                  mkdir -p /tmp/ci-smoke
+                  python3 -c "
+                  import json
+                  export = {
+                      'guild': {'name': 'g'},
+                      'channel': {'id': '1', 'name': 'general'},
+                      'messages': [
+                          {'id': '1', 'author': {'id': 'u1', 'name': 'a'},
+                           'timestamp': '2026-01-01T12:00:00+00:00',
+                           'content': '怎么安装这个？报错了',
+                           'reactions': [], 'attachments': []},
+                          {'id': '2', 'author': {'id': 'u2', 'name': 'b'},
+                           'timestamp': '2026-01-01T12:05:00+00:00',
+                           'content': '用 deepseek 试试，挺好的',
+                           'reactions': [], 'attachments': []},
+                      ],
+                  }
+                  json.dump(export, open('/tmp/ci-smoke/export.json', 'w'), ensure_ascii=False)
+                  "
+                  uv run chatintel-analyze --input /tmp/ci-smoke/export.json --platform discord --out /tmp/ci-smoke/out -v
+                  uv run chatintel-crosstabs --users-json /tmp/ci-smoke/out/users.json --out /tmp/ci-smoke/out/crosstabs.json
+                  uv run chatintel-topics --input-chat /tmp/ci-smoke/export.json --platform discord --dry-run \
+                      --out /tmp/ci-smoke/out/topics.json --stats-path /tmp/ci-smoke/out/stats.json
+                  test -f /tmp/ci-smoke/out/report.md
+                  test -f /tmp/ci-smoke/out/stats.json
+                  test -f /tmp/ci-smoke/out/users.json
+                  test -f /tmp/ci-smoke/out/crosstabs.json
+                  test -f /tmp/ci-smoke/out/topics.json
+                  echo "=== smoke test passed ==="
+            - name: Build sdist + wheel
+              run: uv build
+            - name: Upload artifacts
+              uses: actions/upload-artifact@v5
+              with:
+                  name: dist
+                  path: dist/
