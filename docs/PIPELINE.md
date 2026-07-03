@@ -126,14 +126,14 @@ Add your own `QUERIES_BY_LANGUAGE` entry for other languages, or edit the existi
 
 ## Stream C — Structured Fact Extraction
 
-**Files:** `fact_extraction.py`, `fact_extraction_retry.py`
+**File:** `fact_extraction.py`
 
 ### What it does
 
 1. Splits all content messages into windows of ~100 consecutive messages (preserving conversational order)
 2. Feeds each chunk to an LLM with a JSON schema requesting 10 categories of structured facts
 3. Aggregates facts across all chunks
-4. On failure, `fact_extraction_retry.py` re-runs failed chunks with tolerant JSON parsing
+4. Uses tolerant JSON parsing (trailing-comma stripping, json5 fallback) on every chunk — no separate retry pass needed
 
 ### The 10 fact categories
 
@@ -175,22 +175,14 @@ fact_extraction.py
   ├── For each chunk (concurrency=4):
   │     ├── Check cache → skip if done
   │     ├── Call LLM with schema prompt
-  │     ├── Parse JSON response
+  │     ├── Tolerant JSON parse (strict → strip commas → json5 → last-object)
   │     ├── Write to cache (append, flush)
   │     └── Log progress every 5 chunks
   ├── Aggregate all facts
-  └── Write aggregated_facts.json + summary.json
+  └── Write aggregated_facts.json + summary.json + extraction_errors.json
 
-If extraction_errors.json is non-empty:
-fact_extraction_retry.py
-  ├── Reread error chunks
-  ├── Retry with tolerant JSON parsing:
-  │     ├── Strict json.loads
-  │     ├── Strip trailing commas (a common LLM failure mode)
-  │     ├── json5 fallback (optional dependency)
-  │     └── Last-resort: extract last JSON object from concatenated output
-  ├── Append recovered chunks to cache
-  └── Rebuild aggregates
+If extraction_errors.json is non-empty, those chunks failed even tolerant
+parsing. Inspect the `_raw` field in the cache for manual review.
 ```
 
 ### Performance
@@ -371,8 +363,7 @@ python -m chatintel.streams.semantic_retrieval
 # 5. Stream C — structured fact extraction
 python -m chatintel.streams.fact_extraction
 #    ↑ set CHAT_JSONL, OUT_DIR, TARGET_LANGUAGE env vars before running
-#    If extraction_errors.json is non-empty:
-python -m chatintel.streams.fact_extraction_retry
+#    Tolerant JSON parsing is built in — no separate retry step.
 
 # 6. Cross-stream synthesis
 python -m chatintel.streams.narrative_synthesis
@@ -472,8 +463,7 @@ community-chat-intel/
 │   ├── streams/
 │   │   ├── topics.py                    # Stream A: LLM topic classification (chatintel-topics)
 │   │   ├── semantic_retrieval.py        # Stream B: semantic search + synthesis
-│   │   ├── fact_extraction.py           # Stream C: structured fact extraction
-│   │   ├── fact_extraction_retry.py     # Stream C: tolerant JSON retry
+│   │   ├── fact_extraction.py           # Stream C: structured fact extraction (tolerant JSON)
 │   │   ├── deterministic_analytics.py   # Stream D: ground-truth-anchored
 │   │   ├── narrative_synthesis.py       # Stream synthesis → findings_final_v2.md
 │   │   ├── build_final_report.py        # Final report assembly

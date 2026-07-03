@@ -3,8 +3,18 @@
 
 Splits messages into ~100-message chunks preserving conversational order, feeds
 each chunk to an LLM with a structured-output schema, aggregates structured
-facts across all chunks. See fact_extraction_retry.py for the tolerant-JSON
-retry pass over any chunks that fail strict parsing.
+facts across all chunks. Uses tolerant JSON parsing (trailing-comma stripping,
+json5 fallback) on every chunk so a separate retry pass is not needed.
+
+Env vars:
+  CHAT_JSONL         Path to raw NDJSON export (default ./data/pages.jsonl)
+  OUT_DIR            Output directory (default ./out/stream_c)
+  SALT_FILE          User-ID hashing salt (default ./user_hash_salt.key)
+  TARGET_LANGUAGE    Language name injected into the extraction prompt (default zh)
+  TS_UTC_OFFSET_HOURS  UTC offset for tz-less display timestamps (default 8)
+  LLM_PROVIDER       LLM CLI provider (default nous)
+  LLM_MODEL          LLM CLI model (default xiaomi/mimo-v2.5)
+  CONCURRENCY        Parallel chunk extractions (default 4)
 """
 
 import hashlib
@@ -12,6 +22,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,9 +31,6 @@ CHAT_JSONL = Path(os.environ.get("CHAT_JSONL", "./data/pages.jsonl"))
 OUT_DIR = Path(os.environ.get("OUT_DIR", "./out/stream_c"))
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Target language, used only to phrase the extraction prompt below (does not
-# affect which messages get chunked/extracted — this stream processes all
-# non-system messages regardless of language).
 TARGET_LANGUAGE = os.environ.get("TARGET_LANGUAGE", "zh")
 TARGET_LANGUAGE_NAME = {"zh": "Chinese", "en": "English"}.get(
     TARGET_LANGUAGE, TARGET_LANGUAGE
@@ -31,21 +39,18 @@ TARGET_LANGUAGE_NAME = {"zh": "Chinese", "en": "English"}.get(
 SALT_FILE = Path(os.environ.get("SALT_FILE", "./user_hash_salt.key"))
 SALT = SALT_FILE.read_text().strip() if SALT_FILE.exists() else "default-salt"
 
+DISPLAY_TS_TZ = timezone(
+    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
+)
+
+CONCURRENCY = int(os.environ.get("CONCURRENCY", "4"))
+CHUNK_SIZE = 100
+
 
 def hash_user(uid):
     if not uid:
         return "unknown"
     return "u_" + hashlib.sha256((SALT + uid).encode()).hexdigest()[:12]
-
-
-# Timestamp parsing assumes a fixed UTC offset for "YYYY-MM-DD HH:MM"
-# display-format timestamps some export tools emit without a tz marker.
-# Defaults to +8 (China Standard Time) for backward compatibility with the
-# original Feishu-export worked example; set TS_UTC_OFFSET_HOURS to your
-# own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
-DISPLAY_TS_TZ = timezone(
-    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
-)
 
 
 def parse_ts(s):
@@ -58,6 +63,7 @@ def parse_ts(s):
     return None
 
 
+# ===== Load messages =====
 print("[stream_c] loading messages...", flush=True)
 messages = []
 for line in CHAT_JSONL.open():
@@ -89,11 +95,11 @@ for line in CHAT_JSONL.open():
 messages.sort(key=lambda x: x["ts"])
 print(f"[stream_c] {len(messages):,} messages loaded", flush=True)
 
-# ===== Chunk into windows of ~100 messages =====
-CHUNK_SIZE = 100
+# ===== Chunk =====
 chunks = [messages[i : i + CHUNK_SIZE] for i in range(0, len(messages), CHUNK_SIZE)]
 print(f"[stream_c] {len(chunks)} chunks of ≤{CHUNK_SIZE} messages", flush=True)
 
+# ===== Extraction prompt =====
 EXTRACTION_PROMPT = (
     f"You are analyzing a chunk of chat messages from a product's community chat "
     f"({TARGET_LANGUAGE_NAME}-language, on a chat platform). Extract structured "
@@ -128,13 +134,12 @@ MESSAGES:
 def format_chunk(chunk):
     out = []
     for m in chunk:
-        # truncate long contents, include sender
         c = m["content"].replace("\n", " ")[:500]
         out.append(f"[{m['ts']}] {m['name']}: {c}")
     return "\n".join(out)
 
 
-def call_kimi(prompt, timeout=180):
+def call_llm(prompt, timeout=180):
     cmd = [
         "hermes",
         "chat",
@@ -158,28 +163,62 @@ def call_kimi(prompt, timeout=180):
     return "\n".join(lines).strip()
 
 
+def tolerant_json_parse(raw: str):
+    """Try strict json first, then strip trailing commas, then json5-ish repair.
+
+    Returns (parsed_dict_or_None, error_str_or_None).
+    """
+    cleaned = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+    m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if not m:
+        return None, "no_json_found"
+    body = m.group()
+    # 1. strict
+    try:
+        return json.loads(body), None
+    except json.JSONDecodeError:
+        pass
+    # 2. strip trailing commas: ,] -> ], ,} -> }
+    body2 = re.sub(r",(\s*[\]}])", r"\1", body)
+    try:
+        return json.loads(body2), None
+    except json.JSONDecodeError:
+        pass
+    # 3. try json5 if available (optional soft dependency)
+    try:
+        import json5  # type: ignore[import-not-found]
+
+        return json5.loads(body), None
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    # 4. try the last { ... } in case the LLM concatenated multiple outputs
+    last = re.findall(r"\{[^\{\}]*(?:\{[^\{\}]*\}[^\{\}]*)*\}", body, re.DOTALL)
+    for candidate in reversed(last):
+        candidate2 = re.sub(r",(\s*[\]}])", r"\1", candidate)
+        try:
+            return json.loads(candidate2), None
+        except Exception:
+            continue
+    return None, "all_parsers_failed"
+
+
 def extract_from_chunk(idx, chunk):
     prompt = EXTRACTION_PROMPT + format_chunk(chunk)
     try:
-        raw = call_kimi(prompt)
+        raw = call_llm(prompt)
     except subprocess.TimeoutExpired:
         return idx, {"_error": "timeout"}
     except subprocess.CalledProcessError as e:
         return idx, {"_error": f"subprocess_error: {e.stderr[:200]}"}
-
-    # strip markdown fences, find json object
-    cleaned = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
-    m = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if not m:
-        return idx, {"_error": "no_json_found", "_raw": raw[:500]}
-    try:
-        facts = json.loads(m.group())
-        return idx, facts
-    except json.JSONDecodeError as e:
-        return idx, {"_error": f"json_parse_failed: {e}", "_raw": raw[:500]}
+    facts, err = tolerant_json_parse(raw)
+    if facts is None:
+        return idx, {"_error": err, "_raw": raw[:800]}
+    return idx, facts
 
 
-# ===== Cache =====
+# ===== Cache (resume-safe) =====
 CACHE_FILE = OUT_DIR / "chunks_cache.jsonl"
 cache = {}
 if CACHE_FILE.exists():
@@ -191,22 +230,20 @@ if CACHE_FILE.exists():
             pass
     print(f"[stream_c] loaded {len(cache)} cached chunks", flush=True)
 
-# ===== Run with concurrency =====
-CONCURRENCY = 4
+# ===== Run =====
 all_facts = {}
+all_facts.update(cache)
 
 chunks_to_do = [(i, c) for i, c in enumerate(chunks) if i not in cache]
 print(
-    f"[stream_c] {len(chunks_to_do)}/{len(chunks)} chunks to process (concurrency={CONCURRENCY})",
+    f"[stream_c] {len(chunks_to_do)}/{len(chunks)} chunks to process "
+    f"(concurrency={CONCURRENCY})",
     flush=True,
 )
 
 completed = len(cache)
-all_facts.update(cache)
-
-import time
-
 t0 = time.time()
+
 with (
     ThreadPoolExecutor(max_workers=CONCURRENCY) as ex,
     CACHE_FILE.open("a") as cache_fh,
@@ -225,7 +262,8 @@ with (
         eta = (len(chunks) - completed) / max(0.01, rate) if rate > 0 else 0
         if completed % 5 == 0 or completed == len(chunks):
             print(
-                f"[stream_c] {completed}/{len(chunks)} chunks done ({elapsed:.0f}s elapsed, ~{eta:.0f}s ETA)",
+                f"[stream_c] {completed}/{len(chunks)} chunks done "
+                f"({elapsed:.0f}s elapsed, ~{eta:.0f}s ETA)",
                 flush=True,
             )
 
@@ -259,7 +297,6 @@ for idx, facts in sorted(all_facts.items()):
                     item["_chunk_idx"] = idx
                     aggregated[cat].append(item)
 
-# Save full aggregated
 (OUT_DIR / "aggregated_facts.json").write_text(
     json.dumps(aggregated, indent=2, ensure_ascii=False)
 )
@@ -267,13 +304,12 @@ for idx, facts in sorted(all_facts.items()):
     json.dumps(errors, indent=2, ensure_ascii=False)
 )
 
-# Summary counts
+# Summary
 summary = {cat: len(items) for cat, items in aggregated.items()}
 summary["_total_chunks"] = len(all_facts)
 summary["_successful_chunks"] = len(all_facts) - len(errors)
 summary["_error_chunks"] = len(errors)
 
-# Sub-categorizations
 provider_counts = {}
 for item in aggregated["provider_usage"]:
     p = item.get("provider_or_gateway", "unknown")
@@ -311,3 +347,10 @@ print(
 for cat, count in summary.items():
     if not cat.startswith("_"):
         print(f"    {cat}: {count}", flush=True)
+
+if errors:
+    print(
+        f"\n[stream_c] {len(errors)} chunks still failed after tolerant parsing. "
+        f"See extraction_errors.json for details.",
+        flush=True,
+    )

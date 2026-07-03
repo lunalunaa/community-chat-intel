@@ -197,7 +197,7 @@ Four parallel analysis streams were run:
 
 **Stream B — Semantic Retrieval + Narrative Synthesis.** Non-trivial content messages are embedded locally using `BAAI/bge-m3` (multilingual sentence-transformers, CPU) and indexed with FAISS `IndexFlatIP`. A set of structured retrieval queries (tailored to your research questions) are run against the index; for each, the top-K semantically-closest messages are passed to an LLM to produce a short factual analysis with source references. See `semantic_retrieval.py`.
 
-**Stream C — Structured Fact Extraction.** Content messages are chunked into windows of ≤100 consecutive messages preserving conversational order. Each chunk is passed to an LLM with a JSON schema extracting 10 structured fact types: install_problems, provider_usage (with sentiment), messaging_intent (with intent strength), brand_confusion, api_key_sharing_evidence, pricing_complaints, feature_requests, success_stories, vpn_network_friction, and competitor_mentions. A tolerant-JSON retry pass (`fact_extraction_retry.py`) recovers chunks that fail strict parsing (trailing commas are a common LLM failure mode here).
+**Stream C — Structured Fact Extraction.** Content messages are chunked into windows of ≤100 consecutive messages preserving conversational order. Each chunk is passed to an LLM with a JSON schema extracting 10 structured fact types: install_problems, provider_usage (with sentiment), messaging_intent (with intent strength), brand_confusion, api_key_sharing_evidence, pricing_complaints, feature_requests, success_stories, vpn_network_friction, and competitor_mentions. Tolerant JSON parsing (trailing-comma stripping, json5 fallback) is built into the extraction pass itself, so a separate retry script is not needed.
 
 **Stream D — Deterministic Python Analysis.** Pure-Python computation (no LLM) over the raw export: user Pareto curve, stickiness distribution, gateway URL classification, reply-graph analysis, and temporal growth curves. See `deterministic_analytics.py`.
 
@@ -321,8 +321,7 @@ All scripts are in this repository (`src/chatintel/`):
 - `core/analyze.py` (`chatintel-analyze`) — keyword-stats pipeline (produces report.md)
 - `streams/topics.py` (`chatintel-topics`) — Stream A classifier
 - `streams/semantic_retrieval.py` — Stream B embedder + synthesizer
-- `streams/fact_extraction.py` — Stream C fact extractor
-- `streams/fact_extraction_retry.py` — tolerant-JSON retry for failed chunks
+- `streams/fact_extraction.py` — Stream C fact extractor (tolerant JSON built in)
 - `streams/deterministic_analytics.py` — ground-truth-anchored deterministic analysis
 - `streams/narrative_synthesis.py` — final narrative synthesis
 - `streams/post_analysis.py` — brand audit, cost drill, CSV exports

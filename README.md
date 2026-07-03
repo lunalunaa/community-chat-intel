@@ -134,8 +134,7 @@ src/chatintel/
 ├── streams/
 │   ├── topics.py                # Stream A: LLM topic-tagging (chatintel-topics)
 │   ├── semantic_retrieval.py    # Stream B: embeddings + FAISS semantic search
-│   ├── fact_extraction.py       # Stream C: structured LLM fact extraction
-│   ├── fact_extraction_retry.py # Stream C: tolerant-JSON retry pass
+│   ├── fact_extraction.py          # Stream C: structured LLM fact extraction (tolerant JSON)
 │   ├── deterministic_analytics.py # Stream D: ground-truth-anchored analytics
 │   ├── narrative_synthesis.py   # feeds all streams into one LLM synthesis call
 │   ├── build_final_report.py    # assembles methodology + findings + recommendations

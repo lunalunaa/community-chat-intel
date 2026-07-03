@@ -9,7 +9,6 @@
 "src/chatintel/streams/post_analysis.py" = ["E402", "E701", "E722"]
 "src/chatintel/streams/semantic_retrieval.py" = ["E402", "E741"]
 "src/chatintel/streams/fact_extraction.py" = ["E402", "E701", "E741"]
-"src/chatintel/streams/fact_extraction_retry.py" = ["E402", "E701", "E741"]
 "src/chatintel/streams/deterministic_analytics.py" = ["E401", "E701", "E702", "E722"]
 "src/chatintel/streams/topics.py" = ["E741", "F401"]
 "src/chatintel/core/analyze.py" = ["F401"]
