@@ -1,0 +1,36 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+# Trusted publishing — no PyPI token needed.
+# Requires one-time setup on pypi.org:
+#   1. Go to https://pypi.org/manage/account/publishing/
+#   2. Add a new "pending publisher" under "GitHub Actions"
+#   3. Fill in: owner=lunalunaa, repo=parallax, workflow=publish.yml
+#   4. The environment name below must match (pypi)
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # required for trusted publishing
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: false
+      - run: uv python install 3.12
+      - run: uv venv
+      - run: uv pip install -e ".[dev]"
+      - run: uv run pytest tests/ -q
+      - run: uv build
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing
