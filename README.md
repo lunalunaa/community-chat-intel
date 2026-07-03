@@ -202,6 +202,32 @@ parallax-diff --old ./run1/stats.json --new ./run2/stats.json --json
 
 Shows KPI deltas (messages, users, questions, friction, answered rate), per-counter changes with new/gone/changed status, and percentage deltas.
 
+## Dashboard
+
+Generate a self-contained interactive HTML dashboard from `stats.json`:
+
+```bash
+# Single run with drill-down (click any bar to see matching messages):
+python -m parallax.streams.generate_dashboard \
+    --stats out/stats.json --users out/users.json --chat data/export.json \
+    --out out/dashboard.html
+
+# Trend view (compare multiple runs):
+python -m parallax.streams.generate_dashboard \
+    --stats run1/stats.json run2/stats.json run3/stats.json \
+    --out out/dashboard.html
+```
+
+Features:
+- **KPI cards** with delta indicators (↑ 12% vs prev) when comparing runs
+- **Bar lists** for providers, messaging platforms, friction, features, language, install paths, shadow communities, URL categories, location proxy, competitors
+- **Drill-down** — click any bar to expand a panel showing matching messages (timestamp, sender, content)
+- **Trend view** — bar chart comparing total messages across runs, with per-bar deltas
+- **Filter controls** — run selector dropdown, cohort toggle (All / Target-lang), view toggle (Current / Trend)
+- **Self-contained** — no server, no build step, no external JS dependencies. Works fully offline.
+
+See [`examples/quickstart.ipynb`](examples/quickstart.ipynb) for a full walkthrough.
+
 ## Privacy
 
 - User IDs are SHA-256-hashed with a local salt before reaching any output file

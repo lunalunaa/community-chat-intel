@@ -2,16 +2,15 @@
 
 All notable changes to parallax are documented here.
 
-## [Unreleased]
+## [1.0.0] — 2026-07-03
 
 ### Phase 6 — Polish for 1.0
 
 - Added `parallax init` command to scaffold a new project directory with
   config files, salt file, .gitignore, and a project-specific README
-- Added example Jupyter notebook walkthrough
+- Added example Jupyter notebook walkthrough (`examples/quickstart.ipynb`)
 - Added CHANGELOG.md
-
-## [0.5.0] — 2026-07-03
+- Added Dashboard section to README
 
 ### Phase 5 — Incremental analysis
 

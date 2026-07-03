@@ -1108,7 +1108,7 @@ def run_pipeline(
             "target_language_name": language_profile.name if language_profile else None,
             "region": region_profile.code,
             "region_name": region_profile.name,
-            "pipeline_version": "0.4.0",
+            "pipeline_version": "1.0.0",
         },
         "language_distribution": dict(lang_counts),
         "users": {
