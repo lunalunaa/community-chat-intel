@@ -64,7 +64,7 @@ TOPIC_CATEGORIES = [
     "install_help",  # asking how to install / deploy
     "install_report",  # reporting install issue or sharing a fix
     "provider_config",  # model provider setup or API key questions
-    "messaging_adapter",  # IM platform integration questions (Feishu / WeChat / etc.)
+    "messaging_adapter",  # IM platform integration questions
     "feature_usage",  # using product-specific features (skills / memory / cron / etc.)
     "model_discussion",  # which model is best / benchmarks / comparisons
     "community_meta",  # announcements, meetups, links to external content
@@ -101,7 +101,7 @@ For each message in the input batch, assign exactly ONE primary topic from this 
   - install_help       : user is asking HOW to install / deploy the product or a dependency
   - install_report     : user is sharing an install experience, fix, or error
   - provider_config    : questions or discussion about model provider setup / API keys / config
-  - messaging_adapter  : questions or discussion about IM platform integration (Feishu, WeChat, WeCom, DingTalk, Telegram, Discord-as-adapter, etc.)
+  - messaging_adapter  : questions or discussion about IM platform integration (any platform)
   - feature_usage      : using product-specific features (skills / memory / cron / subagents / MCP / browser / vision / etc.)
   - model_discussion   : comparing models, benchmarks, opinions about which LLM is best
   - community_meta     : announcements, links to external content, meetups, events

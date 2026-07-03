@@ -30,7 +30,7 @@ topic_pcts = {k: (v, round(100 * v / total_tagged, 1)) for k, v in topic_counts.
 # Build compact context for the LLM — stay under ~25K chars for safety
 #
 # NOTE: The ground-truth anchors below are EXAMPLE values from a real run
-# (a 20-day, 28,005-message Feishu community export). Replace COMMUNITY_NAME,
+# (an example ~28K-message community export). Replace COMMUNITY_NAME,
 # CORPUS_DESCRIPTION, and GROUND_TRUTH_SUMMARY with your own dataset's facts —
 # these are read from env vars so you can drive this script without editing code.
 COMMUNITY_NAME = os.environ.get("COMMUNITY_NAME", "the community")
@@ -94,7 +94,7 @@ context += f"""
 
 === STREAM D: QUANTITATIVE MEMBERSHIP/NETWORK ANALYSIS (v4 — ground-truth-anchored) ===
 
-Membership reality (from Feishu UI + export reconciliation):
+Membership reality (from admin UI + export reconciliation):
   - Live membership: 3,124 (3,119 humans + 5 bots)
   - Human posters: 878 (28.2% of 3,119 humans)
   - Silent lurkers: 2,241 (71.8% of humans)
@@ -148,13 +148,13 @@ Write a comprehensive descriptive survey in markdown with these sections:
 2. **Who Are They?** — IMPORTANT: anchor membership on the ground-truth numbers above (do not trust any other membership figure derived from message metadata). Discuss the lurker-vs-poster split, any viral spike days, the size of the core engagement cohort, and message concentration among top posters.
 3. **What Do They Talk About?** — topic distribution interpreted; what the dominant category means vs the smaller ones
 4. **Provider / Gateway Landscape** — what they actually use and why (hosted service, direct APIs, OpenRouter, proxy resellers); include sentiment
-5. **Messaging Platform Usage** — Feishu/WeChat/DingTalk breakdown from Stream C messaging_intent + the topic-distribution share for messaging_adapter
+5. **Messaging Platform Usage** — Messaging platform breakdown from Stream C messaging_intent + the topic-distribution share for messaging_adapter
 6. **Install & Setup Reality** — what install paths they use, what breaks
 7. **Competitor Landscape** — this product vs named competitors; include any slang/nickname patterns observed
 8. **Brand Identity & Confusion** — new impersonators/clones surfaced, brand-confusion signals
 9. **API Key Sharing / Gray Market** — resellers, group purchases, invite codes, leaked keys (cite the actual incident count from Stream C)
 10. **Pricing / Token Consumption** — what they complain about
-11. **Network / VPN / Geographic Friction** — what the friction incidents show
+11. **Network / Geographic Friction** — what the friction incidents show
 12. **Feature Requests & Success Stories** — what users ASK for and what they BUILD
 13. **Help Ecosystem Health** — reply-graph signals, answered-rate — note the denominator caveat (only a fraction of humans ever post, so "help rate" denominators matter)
 14. **Notable Quotes / Texture** — 8-10 representative verbatim-style excerpts (paraphrase from the exemplar facts)

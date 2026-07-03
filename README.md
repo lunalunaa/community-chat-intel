@@ -9,7 +9,7 @@
 
 Turn raw chat exports (Discord / Telegram / Lark / any JSON) into structured community-intelligence reports — passively, without running a survey. Combines NLP heuristics, local embeddings (BGE-M3 + FAISS), structured LLM fact extraction, deterministic analytics, and multi-model synthesis into one reproducible pipeline. User IDs are SHA-256-hashed by default; no raw quotes leak into outputs.
 
-Multi-language and multi-region out of the box — pick your target market with `--target-language` / `--region`, or add your own `LanguageProfile` + `RegionProfile`. Originally built and tested against a real ~3,100-member Chinese-language community; now generalized to 13 languages and 7 regions.
+Multi-language and multi-region out of the box — pick your target market with `--target-language` / `--region`, or add your own `LanguageProfile` + `RegionProfile`. Ships with 13 languages and 7 regions as fully-worked examples.
 
 ---
 

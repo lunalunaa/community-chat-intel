@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Stream D (deterministic_analytics.py): pinned to ground truth from a manually-verified membership count.
 
-This script is written for chat platforms (Feishu/Lark, Discord, Slack, etc.)
+This script is written for chat platforms (Discord, Slack, Lark, etc.)
 that don't reliably emit "member left" events, so join-event counts alone
 overstate current membership. Point GROUND_TRUTH_HUMANS / GROUND_TRUTH_BOTS at
 whatever your platform's admin UI reports as of your export date — that
 becomes the authoritative denominator for retention and engagement rates.
 
-Example (from a real 20-day, 28K-message run on a Feishu community):
+Example (from a real 20-day, ~28K-message community export):
   - Verified humans: 3,119 / bots: 5 / total live members: 3,124
   - Human posters: 878 (28.2%) vs. 2,241 silent lurkers (71.8%)
   - ~49 inferred departures (join-events observed minus live membership)
@@ -44,7 +44,7 @@ def hash_user(label):
 # Timestamp parsing assumes a fixed UTC offset for "YYYY-MM-DD HH:MM"
 # display-format timestamps some export tools emit without a tz marker.
 # Defaults to +8 (China Standard Time) for backward compatibility with the
-# original Feishu-export worked example; set TS_UTC_OFFSET_HOURS to your
+# original worked example; set TS_UTC_OFFSET_HOURS to your
 # own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
 DISPLAY_TS_TZ = timezone(
     timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
@@ -181,7 +181,7 @@ pareto_out = {
         "join_events_system_msgs": join_events_observed,
         "unique_joiner_names_system_msgs": unique_joiners_observed,
         "inferred_net_departures_20d": unique_joiners_observed - GROUND_TRUTH_HUMANS,
-        "note": "Feishu does not log leave/removal events. Difference vs ground truth = inferred departures.",
+        "note": "Some platforms do not log leave/removal events. Difference vs ground truth = inferred departures.",
     },
     "posters_by_type": {
         "human_posters": len(human_posters),
@@ -314,7 +314,7 @@ for d in all_days:
 
 print("=== GROUND-TRUTH-ANCHORED ANALYSIS ===")
 print(
-    f"Live membership (Feishu UI): {GROUND_TRUTH_MEMBERS:,}  ({GROUND_TRUTH_HUMANS:,} humans + {GROUND_TRUTH_BOTS} bots)"
+    f"Live membership (admin UI): {GROUND_TRUTH_MEMBERS:,}  ({GROUND_TRUTH_HUMANS:,} humans + {GROUND_TRUTH_BOTS} bots)"
 )
 print(
     f"Observed join events:         {join_events_observed:,} ({unique_joiners_observed:,} unique names)"

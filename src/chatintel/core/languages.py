@@ -1,6 +1,6 @@
 """Language & region profiles for the community chat-analysis pipeline.
 
-Centralizes everything that used to be Chinese-specific so the pipeline works
+Centralizes all language- and region-specific behavior so the pipeline works
 for any target-language community:
 
   - LANGUAGE_PROFILES   : how to detect "target language" vs "other" vs "mixed"
@@ -192,8 +192,7 @@ def script_ratio(text: str, profile: LanguageProfile) -> float:
 def classify_language(text: str, profile: LanguageProfile) -> str:
     """Return one of: 'target', 'mixed', 'other', 'unknown'.
 
-    Same three-tier heuristic the pipeline originally used for Chinese,
-    generalized to any registered language profile:
+    Same three-tier heuristic, generalized to any registered language profile:
       - ratio >= 0.7                          -> "target"
       - ratio >= profile.threshold            -> "mixed"
       - a handful of target-script hits in a long-enough message

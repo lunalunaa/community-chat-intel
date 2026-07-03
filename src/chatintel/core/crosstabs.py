@@ -53,19 +53,17 @@ from chatintel.core import languages as lang
 
 # Provider clusters — aggregate the provider labels into strategic buckets.
 # "regional_api" membership comes from the active RegionProfile.regional_providers
-# (see languages.py) so this generalizes beyond the Chinese-market provider set.
+# (see languages.py) so this adapts to whatever region you're analyzing.
 GLOBAL_PROVIDER_CLUSTERS = {
-    "western_api": {"anthropic_claude", "openai", "gemini_google"},
+    "global_api": {"anthropic_claude", "openai", "gemini_google"},
     "aggregator_or_portal": {"openrouter", "huggingface", "modelscope"},
     "self_hosted": {"ollama", "vllm", "llamacpp", "lmstudio"},
 }
 
-# Messaging platform — collapse to 4 buckets
+# Messaging platform — collapse into broader buckets
 MESSAGING_BUCKETS = {
-    "feishu_lark": {"feishu", "lark_intl"},
-    "wechat_family": {"wechat", "wecom"},
-    "dingtalk": {"dingtalk"},
-    "western_im": {"discord", "telegram", "slack", "signal", "matrix", "whatsapp"},
+    "enterprise_im": {"feishu_lark", "wechat", "wecom", "dingtalk", "slack"},
+    "consumer_im": {"telegram", "discord", "signal", "matrix", "whatsapp"},
 }
 
 # Deep / differentiator features (vs basic chat use) — EXAMPLE set, matches
@@ -333,9 +331,11 @@ def build_crosstabs(
     location_fn = lambda u: user_location(u, region_profile)  # noqa: E731
 
     # Restrict to target-language cohort: target_primary + bilingual. Accepts
-    # both the current key names and the legacy zh_primary/en_primary labels
-    # for users.json files produced before the language-generalization pass.
-    target_cohort_labels = ("target_primary", "bilingual", "zh_primary")
+    target_cohort_labels = (
+        "target_primary",
+        "bilingual",
+        "zh_primary",
+    )  # zh_primary kept for back-compat with older users.json
     cohort_users = [
         u for u in users if u.get("language_primary") in target_cohort_labels
     ]
@@ -366,7 +366,7 @@ def build_crosstabs(
             "region": region_profile.code,
             "total_users": len(users),
             "reference_time": now.isoformat(),
-            # Back-compat alias for the original Chinese-specific key name
+            # Back-compat alias
             "chinese_cohort_size": len(cohort_users),
         },
     }
@@ -387,10 +387,10 @@ def build_crosstabs(
                 "If `regional_api` is concentrated in this region's primary geography bucket, "
                 "local users rely on regional providers — "
                 "strengthens the case for investing in that provider's UX. "
-                "If `western_api` dominates the other geography buckets, the diaspora/overseas "
-                "cohort still works via Anthropic/OpenAI and doesn't need regional-specific provider UX."
+                "If `global_api` dominates the other geography buckets, the overseas "
+                "cohort works via major global providers and doesn't need regional-specific provider UX."
             ),
-            note="Multi-row: a user mentioning both a regional and a Western provider counts in both provider-cluster rows.",
+            note="Multi-row: a user mentioning both a regional and a global provider counts in both provider-cluster rows.",
         )
     )
 
@@ -402,12 +402,13 @@ def build_crosstabs(
             "2. Messaging platform × Location",
             t,
             interpretation=(
-                "Which IM platform does each geography actually care about? "
-                "`feishu_lark` concentrated in this region's primary geography bucket → a Feishu-adapter "
-                "investment is regionally-driven. `wechat_family` dominating → pivot toward WeChat instead. "
-                "`dingtalk` non-trivial → enterprise-adjacent local users; consider a DingTalk adapter."
+                "Which messaging platform does each geography actually care about? "
+                "If `enterprise_im` is concentrated in this region's primary geography bucket → "
+                "enterprise-adapter demand is regionally-driven. "
+                "If `consumer_im` dominates → users are on consumer-grade chat platforms; "
+                "prioritize accordingly."
             ),
-            note="Multi-row: a user mentioning both Feishu and WeChat counts in both rows.",
+            note="Multi-row: a user mentioning multiple platforms counts in each matching row.",
         )
     )
 

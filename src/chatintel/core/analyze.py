@@ -6,11 +6,11 @@ normalized canonical JSON), produces:
   - users.json : per-user profiles (hashed ids)
   - report.md  : report-template.md with stats placeholders filled in
 
-Works for any target-language / region community — not just Chinese. Pick a
+Works for any target-language / region community. Pick a
 target language and region with `--target-language` / `--region` (see
 `languages.py` for the full list, or add your own language/region profile
-there). Defaults to `zh` / `cn` for backward compatibility with existing
-configs; pass `--target-language none` to disable language classification
+there). Defaults to `zh` / `cn` as one fully-worked example; pass
+`--target-language none` to disable language classification
 entirely (every message counts as "target" — useful for already-monolingual
 exports where you don't need the cohort split).
 
@@ -47,6 +47,7 @@ import argparse
 import collections
 import hashlib
 import json
+import os
 import re
 import secrets
 import sys
@@ -188,7 +189,7 @@ def load_canonical(path: Path, salt: str) -> Iterator[Message]:
 
 
 # ----------------------------------------------------------------------------
-# Lark / Feishu adapter
+# Lark / Feishu export adapter
 # ----------------------------------------------------------------------------
 
 
@@ -302,11 +303,13 @@ def _lark_timestamp(raw: Any) -> datetime:
             for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
                 try:
                     dt = datetime.strptime(raw, fmt)
-                    # The shortcut emits these in LOCAL time with NO tz marker;
-                    # assume UTC+8 (the Lark/Feishu default) to avoid silently misclassifying.
-                    return dt.replace(tzinfo=timezone(timedelta(hours=8))).astimezone(
-                        timezone.utc
-                    )
+                    # The export tool emits these in LOCAL time with NO tz marker;
+                    # assume a fixed offset (default UTC+8, override via
+                    # TS_UTC_OFFSET_HOURS env var) to avoid silently misclassifying.
+                    offset = float(os.environ.get("TS_UTC_OFFSET_HOURS", "8"))
+                    return dt.replace(
+                        tzinfo=timezone(timedelta(hours=offset))
+                    ).astimezone(timezone.utc)
                 except ValueError:
                     continue
 
@@ -655,7 +658,7 @@ class UserProfile:
         Returns one of: 'silent', 'target_primary', 'other_primary', 'bilingual'.
         ('target_primary'/'other_primary' replace the old 'zh_primary'/
         'en_primary' labels — generalized to any target language, not just
-        Chinese. 'silent' means the user posted nothing usable to classify.)
+        in the profile's language. 'silent' means the user posted nothing usable to classify.)
         """
         if self.message_count == 0:
             return "silent"
@@ -696,7 +699,7 @@ def classify_url(url: str) -> tuple[str, str]:
     if "modelscope" in domain:
         return ("modelscope", domain)
     # Vendor domains associated with region-specific model providers (currently
-    # covers the Chinese-market provider set; extend/edit for other regions).
+    # covers common providers; extend for other regions).
     regional_vendor_domains = [
         "volcengine.com",
         "bytedance.com",
@@ -972,7 +975,7 @@ def run_pipeline(
             "channels": sorted(channel_counts.keys()),
             "channel_message_counts": dict(channel_counts),
             "channel_target_message_counts": dict(channel_target_counts),
-            # Back-compat alias for the original Chinese-specific key name
+            # Back-compat alias
             "channel_zh_message_counts": dict(channel_target_counts),
             "date_range": [
                 _min_ts(filtered),
@@ -998,7 +1001,7 @@ def run_pipeline(
                 1 for u in users.values() if u.language_primary() == "silent"
             ),
             "target_plus_bilingual": len(target_users),
-            # Back-compat aliases (original Chinese-specific key names)
+            # Back-compat aliases
             "zh_primary": len(target_primary_users),
             "en_primary": sum(
                 1 for u in users.values() if u.language_primary() == "other_primary"
@@ -1137,7 +1140,7 @@ def main() -> int:
         "ru, ar, he, th, vi, es, fr, de, pt, id, ...). "
         "Pass 'none' to disable language classification entirely — every "
         "message counts as target (useful for already-monolingual exports). "
-        "Default: zh (backward-compatible with the original Chinese-focused build).",
+        "Default: zh (one fully-worked example).",
     )
     parser.add_argument(
         "--region",

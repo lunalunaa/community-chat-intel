@@ -39,7 +39,7 @@ TARGET_LANGUAGE_NAME = {"zh": "Chinese", "en": "English"}.get(
 # Timestamp parsing assumes a fixed UTC offset for the "YYYY-MM-DD HH:MM"
 # display-format timestamps some export tools emit without a tz marker.
 # Defaults to +8 (China Standard Time) for backward compatibility with the
-# original Feishu-export worked example; set TS_UTC_OFFSET_HOURS to your
+# original worked example; set TS_UTC_OFFSET_HOURS to your
 # own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
 TS_UTC_OFFSET_HOURS = float(os.environ.get("TS_UTC_OFFSET_HOURS", "8"))
 

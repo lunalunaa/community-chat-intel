@@ -183,17 +183,17 @@ methodology = """## 1. Methodology
 
 ### 1.1 Data collection
 
-Data was extracted from the source chat platform using its official export tooling (e.g. `@larksuite/cli` for Feishu/Lark, `DiscordChatExporter` for Discord, Telegram's built-in JSON export). See `README.md` for adapter-specific instructions. The example run this report template was built from used the Lark Open Platform API endpoint `GET /open-apis/im/v1/messages`, paginated at 50 messages per page.
+Data was extracted from the source chat platform using its official export tooling (e.g. your platform's export tool, `DiscordChatExporter` for Discord, Telegram's built-in JSON export). See `README.md` for adapter-specific instructions. 
 
 ### 1.2 Ground-truth anchoring
 
-Where the platform doesn't reliably emit "member left" events (Feishu/Lark is one such platform), total group membership should be verified directly against the platform's admin UI at export time and passed in via `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` (see `deterministic_analytics.py`). This figure supersedes any membership count derived from join-event system messages, since join counts alone always overstate current membership when leave events aren't logged.
+Where the platform doesn't reliably emit "member left" events (some platforms fall in this category), total group membership should be verified directly against the platform's admin UI at export time and passed in via `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` (see `deterministic_analytics.py`). This figure supersedes any membership count derived from join-event system messages, since join counts alone always overstate current membership when leave events aren't logged.
 
 ### 1.3 Analysis streams
 
 Four parallel analysis streams were run:
 
-**Stream A — Broad Topic Classification.** Chinese/mixed-language (or your target-language) content messages are classified into a fixed set of topic categories (install_help, install_report, provider_config, messaging_adapter, feature_usage, model_discussion, community_meta, brand_identity, bug_report, feature_request, success_story, general_discussion) via an LLM call per batch, with content-hash caching for resume safety. See `topics.py`.
+**Stream A — Broad Topic Classification.** Target-language (or mixed) content messages are classified into a fixed set of topic categories (install_help, install_report, provider_config, messaging_adapter, feature_usage, model_discussion, community_meta, brand_identity, bug_report, feature_request, success_story, general_discussion) via an LLM call per batch, with content-hash caching for resume safety. See `topics.py`.
 
 **Stream B — Semantic Retrieval + Narrative Synthesis.** Non-trivial content messages are embedded locally using `BAAI/bge-m3` (multilingual sentence-transformers, CPU) and indexed with FAISS `IndexFlatIP`. A set of structured retrieval queries (tailored to your research questions) are run against the index; for each, the top-K semantically-closest messages are passed to an LLM to produce a short factual analysis with source references. See `semantic_retrieval.py`.
 
@@ -230,7 +230,7 @@ limitations = """## 4. Limitations & Caveats
 
 **Short time windows distort retention metrics.** If your export window is short (e.g. 20 days), retention metrics beyond "lapsed 30+ days" are definitionally zero. Whether any observed "active core" cohort is stable or itself decaying is unknowable from a single window — rerun periodically to see trends.
 
-**Leave events may not be logged.** Some platforms (Feishu/Lark included) don't emit system messages when users leave or are removed from a group. Churn is then visible only as a residual between join events and live membership; individual-user churn patterns are not recoverable without periodic snapshots.
+**Leave events may not be logged.** Some platforms don't emit system messages when users leave or are removed from a group. Churn is then visible only as a residual between join events and live membership; individual-user churn patterns are not recoverable without periodic snapshots.
 
 ### 4.2 Instrument limitations
 
