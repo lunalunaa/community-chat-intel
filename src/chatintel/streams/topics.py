@@ -23,7 +23,7 @@ WHY THIS DESIGN:
 
 USAGE:
   # First configure a provider on your chosen CLI once, then:
-  python3 topics.py \\
+  chatintel-topics \\
       --users-json ./out/users.json \\
       --input-chat ./discord_export.json \\
       --platform discord \\
@@ -54,10 +54,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-# Reuse the pipeline's adapters + language classifier
-sys.path.insert(0, str(Path(__file__).parent))
-import analyze  # noqa: E402
-import languages as lang  # noqa: E402
+from chatintel.core import analyze
+from chatintel.core import languages as lang
 
 # ----------------------------------------------------------------------------
 # Topic categories — see plan.md §3.4
@@ -505,7 +503,9 @@ def run(
         print(f"[merge] updated {stats_path} with .topics section", file=sys.stderr)
 
         # Re-render report.md so §9b shows real data
-        template_path = Path(__file__).parent / "report-template.md"
+        template_path = (
+            Path(__file__).parent.parent / "templates" / "report-template.md"
+        )
         report_path = stats_path.parent / "report.md"
         if template_path.exists():
             report_md = analyze.render_report(template_path, stats)
@@ -549,7 +549,11 @@ def main() -> int:
         help="Output path for topics.json (default: ./out/topics.json)",
     )
     p.add_argument(
-        "--salt-file", type=Path, default=Path(__file__).parent / "user_hash_salt.key"
+        "--salt-file",
+        type=Path,
+        default=Path("./user_hash_salt.key"),
+        help="User-ID hashing salt file (default: ./user_hash_salt.key in the "
+        "current working directory — never commit this file)",
     )
     p.add_argument(
         "--stats-path",

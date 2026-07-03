@@ -83,7 +83,7 @@ All streams assume:
 | Input | Source |
 |-------|--------|
 | `pages.jsonl` | Raw Feishu export (NDJSON) |
-| Salt key | `~/nous-chinese-analysis/user_hash_salt.key` |
+| Salt key | `./user_hash_salt.key` (or wherever `SALT_FILE` points) |
 
 ### Outputs
 
@@ -102,7 +102,7 @@ Grouped by research question:
 | Category | Queries |
 |----------|---------|
 | **Messaging adapter demand** | `feishu_adapter_demand`, `feishu_actively_building`, `wechat_adapter_demand`, `dingtalk_adapter_demand` |
-| **Gateway/provider landscape** | `nous_portal_usage`, `direct_vendor_api_usage`, `openrouter_usage`, `agent_key_sharing` |
+| **Gateway/provider landscape** | `hosted_service_usage`, `direct_vendor_api_usage`, `openrouter_usage`, `agent_key_sharing` |
 | **Topic texture** | `install_friction`, `brand_identity_confusion`, `pricing_complaints`, `vpn_friction`, `success_stories`, `feature_requests`, `skills_memory_cron_usage` |
 | **Competitor sentiment** | `comparison_with_claw_products`, `comparison_with_claude_code` |
 | **External communities** | `mentions_of_external_communities` |
@@ -153,7 +153,7 @@ Grouped by research question:
 | Input | Source |
 |-------|--------|
 | `pages.jsonl` | Raw Feishu export |
-| Salt key | `~/nous-chinese-analysis/user_hash_salt.key` |
+| Salt key | `./user_hash_salt.key` (or wherever `SALT_FILE` points) |
 
 ### Outputs
 
@@ -375,39 +375,39 @@ When reproducing against a new dataset, run in this order:
 #    Result: pages.jsonl (NDJSON, one JSON object per line)
 
 # 1. Core pipeline (optional — establishes keyword baselines)
-python3 analyze.py --input pages.jsonl --platform lark --out ./out -v
+chatintel-analyze --input pages.jsonl --platform lark --out ./out -v
 
 # 2. Stream A — topic classification
-python3 topics.py \
+chatintel-topics \
     --input-chat pages.jsonl \
     --platform lark \
     --out ./out/topics.json
 
 # 3. Stream D — deterministic analysis (run first; cheapest, catches data issues)
-python3 stream_d_v4.py
-#    ↑ edit CHAT_JSONL, OUT_DIR, GROUND_TRUTH_HUMANS/BOTS before running
+python -m chatintel.streams.stream_d_v4
+#    ↑ set CHAT_JSONL, OUT_DIR, GROUND_TRUTH_HUMANS/BOTS env vars before running
 
 # 4. Stream B — semantic retrieval + synthesis
-python3 stream_b_embed_retrieve.py
-#    ↑ edit CHAT_JSONL, OUT_DIR before running
+python -m chatintel.streams.stream_b_embed_retrieve
+#    ↑ set CHAT_JSONL, OUT_DIR env vars before running
 #    Slowest step (embedding). Cache survives reruns.
 
 # 5. Stream C — structured fact extraction
-python3 stream_c_fact_extract.py
-#    ↑ edit CHAT_JSONL, OUT_DIR before running
+python -m chatintel.streams.stream_c_fact_extract
+#    ↑ set CHAT_JSONL, OUT_DIR env vars before running
 #    If extraction_errors.json is non-empty:
-python3 stream_c_retry.py
+python -m chatintel.streams.stream_c_retry
 
 # 6. Cross-stream synthesis
-python3 cross_stream_synthesis.py
+python -m chatintel.streams.cross_stream_synthesis
 #    → findings_final_v2.md
 
 # 7. Post-analysis drills
-python3 post_analysis.py
+python -m chatintel.streams.post_analysis
 #    → post/brand_audit.md, post/token_consumption.md, post/*.csv
 
 # 8. Final report assembly
-python3 build_final_report.py
+python -m chatintel.streams.build_final_report
 #    → final_report.md
 ```
 
@@ -420,8 +420,8 @@ All stream scripts have hardcoded paths at the top. Before running:
 1. **Set `CHAT_JSONL`** — path to the raw NDJSON export
 2. **Set `OUT_DIR`** — output directory (creates `stream_b/`, `stream_c/`, `stream_d/`, `post/` subdirectories)
 3. **Set ground truth** (Stream D v4 only) — `GROUND_TRUTH_HUMANS` and `GROUND_TRUTH_BOTS` from platform UI
-4. **Verify salt file** — all scripts read `~/nous-chinese-analysis/user_hash_salt.key`
-5. **Check model availability** — scripts call `hermes chat -q --provider nous --model xiaomi/mimo-v2.5` (or `-pro`). If MiMo is down, edit the `subprocess.run` command to use a different model
+4. **Verify salt file** — all scripts read `SALT_FILE` (default `./user_hash_salt.key` in the current working directory)
+5. **Check model availability** — scripts shell out to `hermes chat -q` by default (see `LLM_PROVIDER`/`LLM_MODEL`/`LLM_MODEL_PRO` env vars); if your provider/model is down, override those env vars or edit the `subprocess.run`/`cmd` list in the relevant script
 
 ### Minimum changes for a new dataset
 
@@ -478,152 +478,39 @@ The 244-chunk extraction takes ~45 minutes. If interrupted (Ctrl-C, network blip
 ## File Reference
 
 ```
-nous-chinese-analysis/
+community-chat-intel/
+├── pyproject.toml                # package metadata, console-script entry points
+├── uv.lock                       # pinned dependency lockfile (uv)
+├── ruff.toml                     # lint config
 ├── plan.md                       # Research methodology
-├── README.md                     # Core pipeline docs (analyze.py, topics.py, crosstabs.py)
-├── PIPELINE.md                   # ← THIS FILE
-├── report-template.md            # Template with {{stats.xxx}} placeholders
+├── README.md                     # Core pipeline docs
+├── docs/PIPELINE.md              # ← THIS FILE
 │
-├── analyze.py                    # Core pipeline: adapter → canonical → stats
-├── topics.py                     # Stream A: LLM topic classification
-├── crosstabs.py                  # Cross-tabulation helper
-├── keywords.py                   # Keyword dictionaries + language detection
+├── src/chatintel/
+│   ├── core/
+│   │   ├── analyze.py            # Core pipeline: adapter → canonical → stats (chatintel-analyze)
+│   │   ├── languages.py          # Language/region profile registry
+│   │   ├── keywords.py           # Keyword dictionaries + question-detection patterns
+│   │   └── crosstabs.py          # Cross-tabulation helper (chatintel-crosstabs)
+│   │
+│   ├── streams/
+│   │   ├── topics.py                    # Stream A: LLM topic classification (chatintel-topics)
+│   │   ├── stream_b_embed_retrieve.py   # Stream B: semantic search + synthesis
+│   │   ├── stream_c_fact_extract.py     # Stream C: structured fact extraction
+│   │   ├── stream_c_retry.py            # Stream C: tolerant JSON retry
+│   │   ├── stream_d_v4.py               # Stream D v4: ground-truth-anchored (AUTHORITATIVE)
+│   │   ├── cross_stream_synthesis.py    # Stream synthesis → findings_final_v2.md
+│   │   ├── build_final_report.py        # Final report assembly
+│   │   └── post_analysis.py             # Brand audit, cost drill, CSV exports
+│   │
+│   └── templates/
+│       └── report-template.md    # Template with {{stats.xxx}} placeholders
 │
-├── stream_b_embed_retrieve.py    # Stream B: semantic search + synthesis
-├── stream_c_fact_extract.py      # Stream C: structured fact extraction
-├── stream_c_retry.py             # Stream C: tolerant JSON retry
-├── stream_d_analysis.py          # Stream D v1: original deterministic analysis
-├── stream_d_v2.py                # Stream D v2: membership-aware
-├── stream_d_v3.py                # Stream D v3: poster-vs-member reconciliation
-├── stream_d_v4.py                # Stream D v4: ground-truth-anchored (AUTHORITATIVE)
-├── cross_stream_synthesis.py     # Stream synthesis → findings_final_v2.md
-├── build_final_report.py         # Final report assembly
-├── post_analysis.py              # Brand audit, token drill, CSV exports
-│
-├── daily_service.py              # Daily monitoring: fetch → analyze → digest → dashboard
-├── daily_state.db                # SQLite state (messages, digests, config)
-├── dailies/                      # Generated digests + dashboard
-│   ├── YYYY-MM-DD.md             # Daily digest markdown
-│   ├── feed.md                   # Rolling 7-day feed
-│   ├── dashboard.html            # Self-contained Chart.js dashboard
-│   └── dashboard_data.json       # Machine-readable dashboard data
-│
-├── user_hash_salt.key            # User-ID hashing salt (chmod 600, NOT in git)
-├── synth.json                    # Synthetic test data
+├── user_hash_salt.key            # User-ID hashing salt (chmod 600, NOT in git — gitignored)
 └── out/                          # Core pipeline outputs (gitignored)
 ```
 
----
-
-## Daily Monitoring Service
-
-**File:** `daily_service.py` (1,500 lines) — automated daily fetch, analysis, digest, and dashboard.
-
-### What it does
-
-A standalone service that runs daily (via cron) to:
-
-1. **Fetch** new messages from the Feishu group via `@larksuite/cli` (incremental since last run)
-2. **Analyze** keyword extraction, language detection, question detection, friction signals
-3. **Digest** a structured daily summary generated by MiMo v2.5 (one LLM call per day)
-4. **Dashboard** a self-contained HTML page with Chart.js activity charts
-
-### Commands
-
-```bash
-python3 daily_service.py --init          # First-time setup
-python3 daily_service.py --run           # Fetch + analyze + digest + dashboard
-python3 daily_service.py --run --mock    # Test with stored messages (no live fetch)
-python3 daily_service.py --status        # Show DB state, recent activity
-python3 daily_service.py --digest 3      # Show last 3 digests in terminal
-python3 daily_service.py --dashboard     # Regenerate dashboard from DB
-python3 daily_service.py --config        # Show/set config (chat_id, member_count, etc.)
-```
-
-### State (SQLite)
-
-Single database at `daily_state.db`:
-
-| Table | Purpose |
-|-------|---------|
-| `config` | `chat_id`, `chat_name`, `member_count`, `timezone` |
-| `state` | `last_fetch_ts`, `total_messages_fetched`, `last_run_at` |
-| `messages` | All seen messages (message_id PK, timestamp, sender_hash, content, keywords) |
-| `digests` | Per-day summaries (markdown, TL;DR, counts, friction, unanswered) |
-| `daily_stats` | Per-day aggregate numbers (for dashboard charts) |
-
-### Digest format
-
-Each daily digest is a structured markdown with:
-- **Header** — date, message count, active users, day-over-day delta
-- **What Happened** — 3-5 bullet points capturing the main discussions
-- **Key Themes** — table with topic, share, and signal interpretation
-- **Friction & Issues** — problems, complaints, errors
-- **Notable** — long threads, resolved questions, competitor mentions, brand confusion
-- **TL;DR** — one-sentence summary for notifications
-
-Digests are saved to `dailies/YYYY-MM-DD.md` and appended to a rolling `dailies/feed.md` (last 7 days).
-
-### Dashboard
-
-`dailies/dashboard.html` — self-contained, no server required. Open in any browser.
-
-Features:
-- **KPIs** — today's messages, active users, Chinese share, questions, friction signals
-- **Activity chart** — 14-day bar chart (Chart.js)
-- **User chart** — 14-day active-user line chart
-- **Friction chart** — friction + questions trend lines
-- **Top keywords** — per-category keyword breakdown
-- **Topic distribution** — table with proportional bar visualization
-- **Latest digest** — full daily digest rendered inline
-- **Recent digests** — last 7 days at a glance
-
-Dark theme (GitHub-style), responsive, loads Chart.js from CDN.
-
-### LLM cost
-
-| Component | Calls per run | Model | Est. cost |
-|-----------|--------------|-------|-----------|
-| Digest generation | 1 | MiMo v2.5 | ~$0.02 |
-| Keyword extraction | 0 | N/A (Python, free) | $0 |
-| Dashboard | 0 | N/A (static, free) | $0 |
-| **Total per day** | **1** | | **~$0.02** |
-
-### Scheduling
-
-```bash
-# 1. Create a thin wrapper script (cron --script needs files under ~/.hermes/scripts/)
-cat > ~/.hermes/scripts/chinese-community-daily.sh << 'EOF'
-#!/bin/bash
-cd ~/nous-chinese-analysis && python3 daily_service.py --run
-EOF
-chmod +x ~/.hermes/scripts/chinese-community-daily.sh
-
-# 2. Create the cron job (runs daily at 9am Shanghai = 1am UTC)
-hermes cron create "0 1 * * *" \
-    --name "chinese-community-daily" \
-    --script "chinese-community-daily.sh" \
-    --no-agent \
-    --workdir ~/nous-chinese-analysis
-
-# 3. Verify
-hermes cron list
-python3 daily_service.py --status
-```
-
-The `--no-agent` flag means the script runs directly — no LLM session is spawned. The script's stdout is delivered to the `local` delivery target.
-
-### Prerequisites
-
-Before `--run` works against the live Feishu group, lark-cli must be re-authenticated:
-
-```bash
-/tmp/larkwrap.sh auth login --scope "im:message:readonly im:chat:read im:chat.members:read contact:user.base:readonly"
-```
-
-Test with: `/tmp/larkwrap.sh auth status`
-
----
+A companion daily-monitoring service (scheduled fetch → analyze → digest → self-contained HTML dashboard, backed by a small SQLite state DB) exists in the original internal project this repo was generalized from, but is **not included here** — it depends on org-specific scheduling/delivery infrastructure. If you want to build your own daily-digest service on top of this pipeline, the shape to replicate is: (1) incrementally fetch new messages since the last run, (2) run them through `chatintel-analyze` + keyword extraction, (3) generate a one-LLM-call daily digest, (4) regenerate a self-contained HTML dashboard (see [`docs/DASHBOARD.md`](DASHBOARD.md) for the dashboard's data contract and layout). Wire step 1 into whatever scheduler you use (cron, systemd timer, GitHub Actions, etc.).
 
 ## Version History
 

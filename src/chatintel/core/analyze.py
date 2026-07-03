@@ -14,8 +14,8 @@ configs; pass `--target-language none` to disable language classification
 entirely (every message counts as "target" — useful for already-monolingual
 exports where you don't need the cohort split).
 
-Usage:
-    python analyze.py \\
+USAGE:
+    chatintel-analyze \\
         --input path/to/export.json \\
         --platform discord \\
         --out ./out/ \\
@@ -55,8 +55,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-import keywords as kw  # local keywords.py
-import languages as lang  # local languages.py
+from chatintel.core import keywords as kw
+from chatintel.core import languages as lang
 
 # ----------------------------------------------------------------------------
 # Canonical message schema
@@ -1141,10 +1141,19 @@ def main() -> int:
         "to 'global'. Default: cn (backward-compatible).",
     )
     parser.add_argument(
-        "--template", type=Path, default=Path(__file__).parent / "report-template.md"
+        "--template",
+        type=Path,
+        default=Path(__file__).parent.parent / "templates" / "report-template.md",
+        help="Report template with {{stats.xxx}} placeholders "
+        "(default: the bundled chatintel/templates/report-template.md)",
     )
     parser.add_argument(
-        "--salt-file", type=Path, default=Path(__file__).parent / "user_hash_salt.key"
+        "--salt-file",
+        type=Path,
+        default=Path("./user_hash_salt.key"),
+        help="User-ID hashing salt file, auto-generated on first run if missing "
+        "(default: ./user_hash_salt.key in the current working directory — "
+        "never commit this file)",
     )
     parser.add_argument(
         "--channels",

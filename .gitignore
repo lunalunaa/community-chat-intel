@@ -24,6 +24,8 @@ __pycache__/
 venv/
 *.egg-info/
 .ruff_cache/
+build/
+dist/
 
 # Caches
 .topics_cache.json

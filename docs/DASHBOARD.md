@@ -1,5 +1,7 @@
 # Dashboard — Usage & Interpretation Guide
 
+> **Scope note:** this document describes a companion daily-monitoring service (`daily_service.py`) that generates the dashboard below. That service is **not included in this repo** — it depends on org-specific scheduling/delivery infrastructure and isn't part of the core `chatintel` package. This doc is kept as a design reference / worked example for anyone building their own daily-digest service on top of `chatintel-analyze`'s output (see the "Daily Monitoring Service" note in `docs/PIPELINE.md`'s File Reference section for the minimal shape to replicate).
+
 > The daily service renders a self-contained HTML dashboard at `dailies/dashboard.html`.  
 > No server, no build step — open it in any browser. Everything is embedded.
 
@@ -67,7 +69,7 @@ Four key performance indicators for the most recent day of data:
 |--------|-------------------|
 | **Messages** | Total messages today. Compare day-over-day in the activity chart. |
 | **Active users** | Unique posters today. Typical range: 30–80 for a 3K-member chat. |
-| **Chinese** | Messages flagged as Chinese or mixed-language by the CJK-ratio heuristic. Usually 70-90% of messages. |
+| **Target-language** | Messages flagged as target-language or mixed-language by the configured `LanguageProfile` (see `src/chatintel/core/languages.py`) — script-ratio for CJK/Cyrillic/Arabic/etc., stopword-ratio for Latin-script languages. Usually 70-90% of messages for a well-scoped target-language chat. |
 | **Questions** | Messages ending in `?`/`？`/`吗`/`呢` or containing question keywords. |
 | **Friction signals** | Errors, VPN complaints, timeout, confusion, API key issues, and other problem keywords. |
 
@@ -197,6 +199,8 @@ Look at the `Last fetch` timestamp. If it's more than 25 hours old and `Lark aut
 ```bash
 /tmp/larkwrap.sh auth login --scope "im:message:readonly im:chat:read im:chat.members:read contact:user.base:readonly"
 ```
+
+(`/tmp/larkwrap.sh` is a placeholder for whatever lark-cli auth wrapper your own daily-service implementation uses — see the scope note at the top of this file.)
 
 ---
 

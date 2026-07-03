@@ -4,7 +4,7 @@
 
 **Companion documents (repo-internal):**
 - `README.md` — quick-start and file overview
-- `analyze.py` — the Python pipeline implementing this plan
+- `analyze.py` (`chatintel-analyze` once installed) — the Python pipeline implementing this plan
 - `report-template.md` — skeleton of the final findings report
 - `docs/PIPELINE.md` — the deeper 4-stream analysis architecture
 
@@ -275,7 +275,7 @@ Cost estimate: at ~20K Chinese messages, a few dollars on a cheap Chinese-market
 | Phase | Effort | Who |
 |---|---|---|
 | 1. Export chat history from Discord / Telegram / etc. | 1–4 hours depending on scope | Requester |
-| 2. Run `analyze.py` on the export | 15 min (CPU) + 1–2 hours (LLM pass) | Analyst |
+| 2. Run `chatintel-analyze` on the export | 15 min (CPU) + 1–2 hours (LLM pass) | Analyst |
 | 3. Review stats, sanity-check, iterate keyword dictionaries | 2–3 hours | Analyst |
 | 4. Fill in report template, write narrative sections | 3–4 hours | Analyst |
 | 5. Internal review | 1–2 days elapsed | Leadership |
@@ -302,9 +302,9 @@ Cost estimate: at ~20K Chinese messages, a few dollars on a cheap Chinese-market
 - [ ] Requester selects platform(s) and scope (which channels, which date range)
 - [ ] Requester runs the export tool and produces a JSON file
 - [ ] Analyst updates `keywords.py` for any platform-specific terminology
-- [ ] Analyst runs `analyze.py --input <export.json> --platform discord --out ~/nous-chinese-analysis/out/`
+- [ ] Analyst runs `chatintel-analyze --input <export.json> --platform discord --out ./out/`
 - [ ] Analyst reviews `stats.json` and decides if LLM topic pass is needed (default: yes)
-- [ ] Analyst runs `analyze.py --stage topics` if skipped initially
+- [ ] Analyst runs `chatintel-topics --input-chat <export.json> --platform discord --out ./out/topics.json` if skipped initially
 - [ ] Analyst fills `report.md` from the template + stats
 - [ ] Analyst produces `excerpts.md` with paraphrased illustrative quotes
 - [ ] Review with leadership

@@ -32,7 +32,7 @@ Output:
   - merges into stats.json as .crosstabs
 
 USAGE:
-  python3 crosstabs.py --users-json ./out/users.json --region jp --out ./out/crosstabs.json [--stats-path ./out/stats.json]
+  chatintel-crosstabs --users-json ./out/users.json --region jp --out ./out/crosstabs.json [--stats-path ./out/stats.json]
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import languages as lang  # local languages.py
+from chatintel.core import languages as lang
 
 # ----------------------------------------------------------------------------
 # Category definitions — how we collapse per-user counters into pivot axes
