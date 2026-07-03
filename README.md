@@ -130,7 +130,16 @@ src/parallax/
 │   ├── analyze.py               # main pipeline (parallax-analyze)
 │   ├── languages.py             # language/region profile registry
 │   ├── keywords.py              # keyword dictionaries — tune for your product
-│   └── crosstabs.py             # cross-tabulation helper (parallax-crosstabs)
+│   ├── crosstabs.py             # cross-tabulation helper (parallax-crosstabs)
+│   ├── config.py                # YAML config loader (fact_schema, queries, etc.)
+│   ├── diff.py                  # stats comparison tool (parallax-diff)
+│   └── state.py                 # SQLite state store for --incremental
+├── config/                      # YAML config files (override via PARALLAX_CONFIG_DIR)
+│   ├── fact_schema.yaml         # Stream C extraction schema
+│   ├── queries.yaml             # Stream B retrieval queries by language
+│   ├── brand_patterns.yaml      # post_analysis brand audit patterns
+│   ├── url_domains.yaml         # URL classification domain lists
+│   └── canonical_schema.json    # JSON Schema for --platform canonical
 ├── streams/
 │   ├── topics.py                # Stream A: LLM topic-tagging (parallax-topics)
 │   ├── semantic_retrieval.py    # Stream B: embeddings + FAISS semantic search
@@ -153,6 +162,32 @@ src/parallax/
 | Slack | `slack` | Slack workspace → Settings → Export workspace data (zip or directory of JSONs) |
 | CSV (generic) | `csv` | Any tool that produces a CSV with a `content` column (plus optional `author`, `timestamp`, `channel`) |
 | Anything else | `canonical` | Match the [canonical JSON schema](src/parallax/config/canonical_schema.json) |
+
+## Incremental analysis
+
+Re-running `parallax-analyze` on an updated export normally processes everything from scratch. With `--incremental`, only new messages (by message ID) are processed, and results are merged into the existing `stats.json`:
+
+```bash
+# First run (full):
+parallax-analyze --input export.json --platform discord --out ./out
+
+# Subsequent runs (incremental):
+parallax-analyze --input export_updated.json --platform discord --out ./out --incremental -v
+```
+
+A SQLite state store (`parallax_state.db` in the output dir) tracks which message IDs have been seen. Counter-type stats (providers, friction, features, etc.) are summed; user counts take the max (conservative, since the same user may appear in both runs).
+
+## Comparing runs
+
+Use `parallax-diff` to compare two `stats.json` files:
+
+```bash
+parallax-diff --old ./run1/stats.json --new ./run2/stats.json
+# or JSON output:
+parallax-diff --old ./run1/stats.json --new ./run2/stats.json --json
+```
+
+Shows KPI deltas (messages, users, questions, friction, answered rate), per-counter changes with new/gone/changed status, and percentage deltas.
 
 ## Privacy
 

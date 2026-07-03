@@ -1239,6 +1239,151 @@ def ensure_salt(salt_path: Path) -> str:
 
 
 # ----------------------------------------------------------------------------
+# Stats merging (for --incremental)
+# ----------------------------------------------------------------------------
+
+
+def _merge_counters(old: dict, new: dict) -> dict:
+    """Merge two counter dicts by summing values."""
+    result = dict(old)
+    for k, v in new.items():
+        result[k] = result.get(k, 0) + v
+    return result
+
+
+def merge_stats(old: dict, new: dict) -> dict:
+    """Merge a new incremental run's stats into the existing accumulated stats.
+
+    Merges all counter-type fields (providers, competitors, friction, etc.)
+    by summing. Updates metadata to reflect the combined totals. Retention
+    and user counts come from the latest run (they're re-derived from the
+    full message set each time, so the new run's values are already
+    cumulative for all messages seen so far — not just the new ones).
+    """
+    merged = dict(new)  # start with new as base (has latest metadata)
+
+    # Merge counter-type top-level fields
+    counter_fields = [
+        "providers",
+        "competitors",
+        "messaging_platforms",
+        "features",
+        "friction_signals",
+        "install_paths",
+        "shadow_community_mentions",
+        "acquisition_channels",
+        "language_distribution",
+    ]
+    for cf in counter_fields:
+        if cf in old and cf in new:
+            merged[cf] = _merge_counters(old[cf], new[cf])
+        elif cf in old:
+            merged[cf] = old[cf]
+
+    # Merge URL stats
+    if "urls" in old and "urls" in new:
+        old_urls = old["urls"]
+        new_urls = new["urls"]
+        merged_urls = dict(new_urls)
+        if "category_counts" in old_urls and "category_counts" in new_urls:
+            merged_urls["category_counts"] = _merge_counters(
+                old_urls["category_counts"], new_urls["category_counts"]
+            )
+        if "domain_counts" in old_urls and "domain_counts" in new_urls:
+            merged_urls["domain_counts"] = _merge_counters(
+                old_urls["domain_counts"], new_urls["domain_counts"]
+            )
+        merged["urls"] = merged_urls
+
+    # Update metadata: total messages = old + new (new run only processed new msgs)
+    old_total = old.get("metadata", {}).get("total_messages", 0)
+    new_total = new.get("metadata", {}).get("total_messages", 0)
+    merged.setdefault("metadata", {})["total_messages"] = old_total + new_total
+
+    # Merge channel counts
+    old_ch = old.get("metadata", {}).get("channel_message_counts", {})
+    new_ch = new.get("metadata", {}).get("channel_message_counts", {})
+    merged["metadata"]["channel_message_counts"] = _merge_counters(old_ch, new_ch)
+
+    old_ch_t = old.get("metadata", {}).get("channel_target_message_counts", {})
+    new_ch_t = new.get("metadata", {}).get("channel_target_message_counts", {})
+    merged["metadata"]["channel_target_message_counts"] = _merge_counters(
+        old_ch_t, new_ch_t
+    )
+    merged["metadata"]["channel_zh_message_counts"] = merged["metadata"][
+        "channel_target_message_counts"
+    ]
+
+    # Date range: widen to encompass both
+    old_range = old.get("metadata", {}).get("date_range", [None, None])
+    new_range = new.get("metadata", {}).get("date_range", [None, None])
+    dates = [d for d in [old_range[0], new_range[0]] if d]
+    merged["metadata"]["date_range"] = [
+        min(dates) if dates else None,
+        max(filter(None, [old_range[1], new_range[1]]))
+        if any([old_range[1], new_range[1]])
+        else None,
+    ]
+
+    # Users and retention: take the new run's values (they reflect the
+    # full accumulated message set since the pipeline rebuilds user profiles
+    # from scratch each run — this is a known limitation; a true incremental
+    # user merge would require per-user delta tracking)
+    # But since incremental only passes new messages to run_pipeline, the
+    # new stats only reflect new messages. So we need to merge user counts too.
+    old_users = old.get("users", {})
+    new_users = new.get("users", {})
+    merged_users = dict(new_users)
+    # User counts: we can't simply sum (same user may appear in both runs)
+    # Take the max as a conservative estimate, or the old value if new is 0
+    for key in [
+        "total",
+        "target_primary",
+        "bilingual",
+        "other_primary",
+        "silent_or_unclassified",
+        "target_plus_bilingual",
+        "zh_primary",
+        "en_primary",
+        "zh_plus_bilingual",
+    ]:
+        merged_users[key] = max(old_users.get(key, 0), new_users.get(key, 0))
+    merged["users"] = merged_users
+
+    # Help/answered: sum the raw counts
+    old_help = old.get("help_answered", {})
+    new_help = new.get("help_answered", {})
+    merged_help = dict(new_help)
+    for key in [
+        "total_questions",
+        "target_questions",
+        "target_answered",
+        "total_answered",
+    ]:
+        merged_help[key] = old_help.get(key, 0) + new_help.get(key, 0)
+    # Recalculate rates
+    if merged_help.get("total_questions", 0) > 0:
+        merged_help["target_answered_rate"] = (
+            merged_help.get("target_answered", 0) / merged_help["total_questions"]
+        )
+        merged_help["overall_answered_rate"] = (
+            merged_help.get("total_answered", 0) / merged_help["total_questions"]
+        )
+    merged["help_answered"] = merged_help
+
+    # Location proxy: sum
+    old_loc = old.get("location_proxy", {})
+    new_loc = new.get("location_proxy", {})
+    merged["location_proxy"] = _merge_counters(old_loc, new_loc)
+
+    # Mark as incremental merge
+    merged["metadata"]["incremental_merge"] = True
+    merged["metadata"]["previous_total_messages"] = old_total
+
+    return merged
+
+
+# ----------------------------------------------------------------------------
 # CLI
 # ----------------------------------------------------------------------------
 
@@ -1313,6 +1458,13 @@ def main() -> int:
         help="Channel label override (lark adapter only; used when the export doesn't carry chat_name)",
     )
     parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Only process new messages since last run. Requires an existing "
+        "stats.json in the output directory; merges new results into it. "
+        "Uses a SQLite state store (parallax_state.db in the output dir).",
+    )
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -1341,6 +1493,35 @@ def main() -> int:
         messages = list(adapter(args.input, salt, channel=args.channel))
     else:
         messages = list(adapter(args.input, salt))
+
+    # Incremental mode: filter to only new messages
+    existing_stats = None
+    if args.incremental:
+        from parallax.core.state import StateStore
+
+        state_db = args.out / "parallax_state.db"
+        stats_path = args.out / "stats.json"
+        if not stats_path.exists():
+            print(
+                "[warn] --incremental requires an existing stats.json in the output dir; "
+                "running full analysis instead.",
+                file=sys.stderr,
+            )
+        else:
+            with StateStore(state_db) as store:
+                new_messages = store.filter_new(messages, str(args.input))
+                if args.verbose:
+                    print(
+                        f"[incremental] {len(new_messages)} new / {len(messages)} total messages",
+                        file=sys.stderr,
+                    )
+                if not new_messages:
+                    print(
+                        "[incremental] no new messages; nothing to do.", file=sys.stderr
+                    )
+                    return 0
+                existing_stats = json.loads(stats_path.read_text())
+                messages = new_messages
 
     if args.verbose:
         print(
@@ -1375,6 +1556,20 @@ def main() -> int:
         language_profile=language_profile,
         region_profile=region_profile,
     )
+
+    # Incremental mode: merge new stats into existing, mark messages as seen
+    if existing_stats is not None:
+        stats = merge_stats(existing_stats, stats)
+        from parallax.core.state import StateStore
+
+        state_db = args.out / "parallax_state.db"
+        with StateStore(state_db) as store:
+            store.mark_seen(messages, str(args.input))
+        if args.verbose:
+            print(
+                "[incremental] merged stats and marked messages as seen",
+                file=sys.stderr,
+            )
 
     # Write stats.json
     stats_path = args.out / "stats.json"

@@ -378,6 +378,31 @@ python -m parallax.streams.build_final_report
 #    → final_report.md
 ```
 
+### Incremental analysis
+
+When you re-export the same chat periodically, use `--incremental` to only
+process new messages and merge results into the existing `stats.json`:
+
+```bash
+# First run (full):
+parallax-analyze --input export.json --platform discord --out ./out
+
+# Later runs (incremental — only new messages are processed):
+parallax-analyze --input export_updated.json --platform discord --out ./out --incremental -v
+```
+
+A SQLite state store (`parallax_state.db` in the output dir) tracks message
+IDs. Counter-type stats are summed; user counts take the max (conservative).
+
+### Comparing runs
+
+```bash
+parallax-diff --old ./run1/stats.json --new ./run2/stats.json
+parallax-diff --old ./run1/stats.json --new ./run2/stats.json --json
+```
+
+Shows KPI deltas, per-counter changes (new/gone/changed), and percentage deltas.
+
 ---
 
 ## Adapting for a New Dataset
@@ -455,10 +480,20 @@ parallax/
 │
 ├── src/parallax/
 │   ├── core/
-│   │   ├── analyze.py            # Core pipeline (parallax-analyze)
+│   │   ├── analyze.py            # Core pipeline (parallax-analyze, --incremental)
 │   │   ├── languages.py          # Language/region profile registry
 │   │   ├── keywords.py           # Keyword dictionaries + question-detection patterns
-│   │   └── crosstabs.py          # Cross-tabulation helper (parallax-crosstabs)
+│   │   ├── crosstabs.py          # Cross-tabulation helper (parallax-crosstabs)
+│   │   ├── config.py             # YAML config loader (PARALLAX_CONFIG_DIR)
+│   │   ├── diff.py               # Stats comparison tool (parallax-diff)
+│   │   └── state.py              # SQLite state store for --incremental
+│   │
+│   ├── config/                   # YAML config files (override via PARALLAX_CONFIG_DIR)
+│   │   ├── fact_schema.yaml      # Stream C extraction schema
+│   │   ├── queries.yaml          # Stream B retrieval queries by language
+│   │   ├── brand_patterns.yaml   # post_analysis brand audit patterns
+│   │   ├── url_domains.yaml      # URL classification domain lists
+│   │   └── canonical_schema.json # JSON Schema for --platform canonical
 │   │
 │   ├── streams/
 │   │   ├── topics.py                    # Stream A: LLM topic classification (parallax-topics)

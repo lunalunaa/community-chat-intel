@@ -28,6 +28,7 @@ dev = [
 parallax-analyze = "parallax.core.analyze:main"
 parallax-topics = "parallax.streams.topics:main"
 parallax-crosstabs = "parallax.core.crosstabs:main"
+parallax-diff = "parallax.core.diff:main"
 # semantic_retrieval, fact_extraction, deterministic_analytics,
 # narrative_synthesis, build_final_report, and post_analysis are one-shot scripts
 # (module-level code, no main()) — run them with `python -m parallax.streams.<name>`
