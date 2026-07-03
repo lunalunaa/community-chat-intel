@@ -433,23 +433,30 @@ table tr:last-child td {{ border-bottom: none; }}
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  margin-right: 8px;
+  margin-right: 16px;
   vertical-align: bottom;
+  min-width: 60px;
+}}
+.trend-bar .value {{
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-bottom: 4px;
 }}
 .trend-bar .bar {{
-  width: 40px;
+  width: 48px;
   background: var(--accent);
-  border-radius: 3px 3px 0 0;
+  border-radius: 4px 4px 0 0;
   transition: height 0.4s ease;
+  min-height: 4px;
 }}
 .trend-bar .label {{
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--mono);
-  color: var(--dim);
-  margin-top: 4px;
+  color: var(--muted);
+  margin-top: 8px;
   white-space: nowrap;
-  transform: rotate(-30deg);
-  transform-origin: top left;
 }}
 
 /* --- Footer --- */
@@ -488,7 +495,7 @@ table tr:last-child td {{ border-bottom: none; }}
   <div class="card" style="margin-bottom:14px;">
     <h2>Trend — total messages over runs</h2>
     <div class="card-body">
-      <div id="trend-chart" style="height:120px;display:flex;align-items:flex-end;gap:4px;overflow-x:auto;"></div>
+      <div id="trend-chart" style="height:220px;display:flex;align-items:flex-end;gap:4px;overflow-x:auto;padding:20px 0 10px;"></div>
     </div>
   </div>
 </div>
@@ -783,12 +790,15 @@ function renderTrendChart() {{
   const el = document.getElementById('trend-chart');
   if (!el) return;
   const max = Math.max(...RUNS.map(r => r.metadata?.total_messages || 0));
+  const barMaxH = 160;  // leave room for value + label
   el.innerHTML = RUNS.map((r, i) => {{
     const msgs = r.metadata?.total_messages || 0;
-    const h = max > 0 ? (msgs / max * 100) : 0;
+    const h = max > 0 ? Math.max(4, (msgs / max * barMaxH)) : 4;
     const date = (r.metadata?.date_range?.[0] || '?').slice(0, 10);
+    const isCurrent = i === currentRunIdx;
     return `<div class="trend-bar">
-      <div class="bar" style="height:${{h}}px;background:var(--${{i === currentRunIdx ? 'accent' : 'dim'}});" title="${{msgs}} msgs"></div>
+      <div class="value">${{msgs}}</div>
+      <div class="bar" style="height:${{h}}px;background:var(--${{isCurrent ? 'accent' : 'dim'}});opacity:${{isCurrent ? 1 : 0.6}};" title="${{msgs}} msgs"></div>
       <div class="label">${{date}}</div>
     </div>`;
   }}).join('');
