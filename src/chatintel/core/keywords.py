@@ -7,13 +7,13 @@ ASCII terms match as word-boundaries.
 
 Used by analyze.py's keyword-extraction stage.
 
-CUSTOMIZE THIS FILE for your own product/community: swap PRODUCT_FEATURES,
-IMPERSONATOR_DOMAINS, OFFICIAL_DOMAINS, and COMPETITORS for your own.
-Everything else here — LLM providers, messaging platforms, friction signals —
-is generic and should work out of the box for most AI-product communities in
-any language/region. Region-specific "where else do people hang out" and
-timezone-proxy logic live in `languages.py`'s REGION_PROFILES instead of here,
-since those genuinely vary by target region.
+CUSTOMIZE THIS FILE for your own product/community. The sections marked
+EXAMPLE below contain placeholder entries to show the pattern shape —
+replace them with your own product's actual feature names, competitor
+names, and impersonator domains. The generic sections (providers, messaging
+platforms, friction signals, install paths, acquisition channels) are
+broad enough to work out-of-the-box for most AI-product communities, but
+you can extend or trim them to match your ecosystem.
 """
 
 from __future__ import annotations
@@ -21,29 +21,27 @@ from __future__ import annotations
 import re
 
 # ----------------------------------------------------------------------------
-# 1. Model providers — who do users name when they talk about LLMs? Includes
-#    both global/Western providers and several Chinese-market providers,
-#    since AI-product communities worldwide tend to mention both.
+# 1. LLM / AI providers — who do users name when they talk about models?
+#    Broad coverage of both global and regional providers. Trim or extend
+#    to match your community's ecosystem.
 # ----------------------------------------------------------------------------
 PROVIDERS: dict[str, list[str]] = {
-    # Chinese providers
-    "deepseek": ["deepseek", "深度求索", "深度寻索"],
-    "kimi_moonshot": ["kimi", "moonshot", "月之暗面", "月暗"],
-    "qwen_alibaba": ["qwen", "通义", "通义千问", "dashscope", "百炼", "bailian"],
+    "openai": ["openai", "chatgpt", "gpt-4", "gpt-5", "codex"],
+    "anthropic_claude": ["claude", "anthropic", "sonnet", "opus"],
+    "gemini_google": ["gemini", "google ai", "bard"],
+    "deepseek": ["deepseek"],
+    "qwen_alibaba": ["qwen", "通义", "通义千问", "dashscope", "百炼"],
     "glm_zhipu": ["glm", "智谱", "chatglm", "zhipu", "bigmodel"],
-    "minimax": ["minimax", "混元", "abab"],
-    "volcengine_ark": ["volcengine", "火山引擎", "火山方舟", "方舟", "ark"],
+    "kimi_moonshot": ["kimi", "moonshot", "月之暗面"],
+    "minimax": ["minimax", "abab"],
+    "volcengine_ark": ["volcengine", "火山引擎", "方舟", "ark"],
     "doubao": ["doubao", "豆包"],
     "baichuan": ["baichuan", "百川"],
     "yi_01ai": ["01.ai", "零一万物", "yi-"],
-    # Western providers
-    "anthropic_claude": ["claude", "anthropic", "sonnet", "opus"],
-    "openai": ["openai", "chatgpt", "gpt-4", "gpt-5", "codex"],
-    "gemini_google": ["gemini", "google ai", "bard"],
-    "yandexgpt": ["yandexgpt", "yandex gpt", "яндексgpt"],
+    "yandexgpt": ["yandexgpt", "yandex gpt"],
     # Aggregators and self-host
     "openrouter": ["openrouter", "or-"],
-    "huggingface": ["huggingface", "hf", "🤗", "抱抱脸"],
+    "huggingface": ["huggingface", "hf", "🤗"],
     "modelscope": ["modelscope", "魔搭"],
     "ollama": ["ollama"],
     "vllm": ["vllm"],
@@ -65,17 +63,17 @@ COMPETITORS: dict[str, list[str]] = {
 
 # ----------------------------------------------------------------------------
 # 3. Messaging platforms — where do users want to run agents / bots?
+#    Broad coverage of both global and regional platforms.
 # ----------------------------------------------------------------------------
 MESSAGING: dict[str, list[str]] = {
-    "feishu": ["feishu", "飞书"],
-    "lark_intl": ["lark", "larksuite", "lark international"],
-    "wechat": ["wechat", "微信", "wexin", "weixin"],
-    "wecom": ["wecom", "企业微信", "企微", "wework"],
-    "dingtalk": ["dingtalk", "钉钉", "dingding"],
-    "qq": [r"\bqq\b", "腾讯qq"],
     "discord": ["discord"],
     "telegram": ["telegram", "tg", "电报"],
     "slack": ["slack"],
+    "feishu_lark": ["feishu", "飞书", "lark", "larksuite"],
+    "wechat": ["wechat", "微信", "weixin"],
+    "wecom": ["wecom", "企业微信", "企微", "wework"],
+    "dingtalk": ["dingtalk", "钉钉"],
+    "qq": [r"\bqq\b"],
     "signal": ["signal messenger", "signal app"],
     "matrix": ["matrix.org", "matrix protocol", "element.io"],
     "email": ["email", "邮件", "smtp", "imap"],
@@ -86,25 +84,21 @@ MESSAGING: dict[str, list[str]] = {
 # ----------------------------------------------------------------------------
 # 4. Product features — EXAMPLE category (generic AI-agent feature names).
 #    Replace with your own product's actual feature/tool names so mentions
-#    of them get tagged correctly.
+#    of them get tagged correctly. The entries below are illustrative of
+#    the kind of features an AI-agent product might have.
 # ----------------------------------------------------------------------------
 PRODUCT_FEATURES: dict[str, list[str]] = {
-    "skills": ["skill_manage", "skill_view", "skills_list", "skills", "技能", "skill"],
-    "memory": ["memory", "记忆", "持久化", "persistent memory"],
+    "skills": ["skills", "技能", "skill"],
+    "memory": ["memory", "记忆", "persistent memory"],
     "cron": ["cron", "cronjob", "定时任务", "scheduled task"],
     "delegate": ["delegate_task", "subagent", "子任务", "委派"],
-    "browser": [
-        "browser_navigate",
-        "browser_click",
-        "browser automation",
-        "浏览器自动化",
-    ],
+    "browser": ["browser automation", "浏览器自动化"],
     "vision": ["vision_analyze", "视觉", "image analysis"],
     "tts": ["text_to_speech", "tts", "语音合成"],
     "mcp": ["mcp", "mcp server", "model context protocol"],
     "execute_code": ["execute_code", "exec_code", "python sandbox"],
     "terminal_tool": ["terminal tool", "shell tool", "bash tool"],
-    "search": ["search_files", "session_search", "web_search"],
+    "search": ["search_files", "web_search"],
     "edit": [r"\bpatch\b", "write_file", "read_file", "edit_file"],
 }
 
@@ -125,11 +119,20 @@ INSTALL: dict[str, list[str]] = {
 
 # ----------------------------------------------------------------------------
 # 6. Friction signals — errors, failures, help-requests
+#    Includes patterns in multiple scripts since friction language varies
+#    by community language. Extend with your community's language as needed.
 # ----------------------------------------------------------------------------
 FRICTION: dict[str, list[str]] = {
     "error_generic": ["error", "exception", "traceback", "报错", "错误", "异常"],
     "timeout": ["timeout", "time out", "超时"],
-    "vpn_blocked": ["vpn", "翻墙", "proxy", "blocked", "无法访问", "访问不了"],
+    "network_blocked": [
+        "vpn",
+        "proxy",
+        "blocked",
+        "无法访问",
+        "访问不了",
+        "region-locked",
+    ],
     "slow_network": ["slow", "很慢", "卡", "lag", "网络慢"],
     "failed": ["failed", "failure", "失败"],
     "stuck": ["stuck", "卡住", "hang"],
@@ -227,17 +230,17 @@ def question_pattern_for(language_code: str | None) -> re.Pattern:
     return re.compile(combined, re.IGNORECASE)
 
 
-# Backward-compatible default (English + Chinese) for callers that don't pass
+# Default question pattern (English-only) for callers that don't pass
 # a language code.
-QUESTION_PATTERN = question_pattern_for("zh")
+QUESTION_PATTERN = QUESTION_PATTERN_EN
 
 
 # ----------------------------------------------------------------------------
 # Compile helpers
 # ----------------------------------------------------------------------------
 def _compile_dict(d: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
-    """Compile each pattern list into regex. Handles both CJK verbatim and
-    ASCII word-boundaried patterns."""
+    """Compile each pattern list into regex. Handles both non-ASCII verbatim
+    and ASCII word-boundaried patterns."""
     compiled: dict[str, list[re.Pattern]] = {}
     for label, patterns in d.items():
         compiled_patterns = []
