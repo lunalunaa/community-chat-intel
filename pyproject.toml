@@ -15,6 +15,12 @@ dependencies = [
     "numpy>=1.26.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ipykernel>=6.29.0",
+    "basedpyright>=1.20.0",
+]
+
 [project.scripts]
 chatintel-analyze = "chatintel.core.analyze:main"
 chatintel-topics = "chatintel.streams.topics:main"

@@ -78,6 +78,13 @@ pip install -e .
 Either way you end up with the `chatintel-analyze` / `chatintel-topics` / `chatintel-crosstabs` console scripts on `PATH`:
 
 > **Editor / type-checker setup:** this repo ships a `pyrightconfig.json` pointing at `.venv` (`typeCheckingMode: "standard"`), so `basedpyright`/Pyright and editors that shell out to it (Zed, VS Code + Pylance, Neovim) resolve `faiss` / `numpy` / `sentence-transformers` / the `chatintel` package correctly — but **only after you've actually run `uv sync` or `pip install -e .` above**. If your editor reports dozens of "missing import" errors or fails to launch a Python kernel, that almost always means no `.venv` exists yet (or your editor is pointed at a different interpreter) — create the venv first, then point your editor/kernel picker at `.venv/bin/python`. `sentence-transformers`/`faiss-cpu`/`torch` are large (~1-2 GB combined); the first `sync`/`install` can take a few minutes.
+>
+> **Jupyter / notebook kernel (Zed, VS Code, JupyterLab):** if you see `Kernel error: ... No module named ipykernel_launcher`, your editor picked a bare system Python that has no `ipykernel` — not the `.venv` above. Install the dev extras and register a proper kernelspec:
+> ```bash
+> pip install -e ".[dev]"   # or: uv pip install -e ".[dev]"
+> python -m ipykernel install --user --name=chatintel --display-name="chatintel (.venv)"
+> ```
+> Then pick **"chatintel (.venv)"** as the kernel in your editor's kernel/interpreter picker instead of the system Python.
 
 ```bash
 # 1. Get a chat export (Discord/Telegram/Lark — see "Getting chat exports" below)
