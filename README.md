@@ -5,6 +5,7 @@
 [![Code style: ruff](https://img.shields.io/badge/Code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Type checker: basedpyright](https://img.shields.io/badge/Type%20checker-basedpyright-orange.svg)](https://docs.basedpyright.com/)
 [![Package manager: uv](https://img.shields.io/badge/uv-managed-de4c4a.svg)](https://docs.astral.sh/uv/)
+[![CI](https://github.com/lunalunaa/community-chat-intel/actions/workflows/ci.yml/badge.svg)](https://github.com/lunalunaa/community-chat-intel/actions/workflows/ci.yml)
 
 Turn raw chat exports (Discord / Telegram / Lark / any JSON) into structured community-intelligence reports — passively, without running a survey. Combines NLP heuristics, local embeddings (BGE-M3 + FAISS), structured LLM fact extraction, deterministic analytics, and multi-model synthesis into one reproducible pipeline. User IDs are SHA-256-hashed by default; no raw quotes leak into outputs.
 
