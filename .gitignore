@@ -1,0 +1,36 @@
+# Outputs & generated artifacts
+out/
+out_full/
+dailies/
+*.db
+*.sqlite3
+
+# Raw chat exports (never commit real chat data)
+data/
+*.jsonl
+*.ndjson
+
+# Secrets
+user_hash_salt.key
+*.key
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-*/
+venv/
+*.egg-info/
+.ruff_cache/
+
+# Caches
+.topics_cache.json
+*_cache.json
+*_cache.jsonl
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

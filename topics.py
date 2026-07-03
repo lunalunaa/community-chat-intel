@@ -1,0 +1,494 @@
+"""LLM topic-tagging pass for the Nous Chinese chat-history analysis pipeline.
+
+Tags every Chinese / mixed-language message with one of a fixed topic set by
+invoking the user's already-configured Hermes Agent (whichever provider they
+have set up — DeepSeek via custom endpoint, kimi-coding-cn, zai/GLM, whatever).
+
+No direct API calls. No external API keys needed from this script. The
+DEEPSEEK / KIMI / GLM / QWEN key lives in ~/.hermes/.env where Hermes expects
+it, and Hermes handles auth, retries, rate limits, streaming. We just shell
+out to `hermes chat -q`.
+
+WHY THIS DESIGN:
+  - Respects the user's provider preference (no hard-coded provider)
+  - Dogfoods Hermes Agent itself (the thing we're analyzing users of)
+  - Zero additional auth / SDK / dependency surface
+  - Resumable via message-content hash cache
+
+USAGE:
+  # First configure DeepSeek (or any Hermes-supported provider) once:
+  #   hermes model      (interactive setup — pick DeepSeek or Kimi-CN or GLM)
+  # or set DEEPSEEK_API_KEY in ~/.hermes/.env directly
+  # then:
+  python3 topics.py \\
+      --users-json ./out/users.json \\
+      --input-chat ./discord_export.json \\
+      --platform discord \\
+      --out ./out/topics.json \\
+      [--batch-size 25] \\
+      [--concurrency 2] \\
+      [--dry-run] \\
+      [--limit 100]       # for testing / cost-capping
+
+The script writes:
+  - ./out/topics.json              : message_id -> topic
+  - ./out/topics_by_category.json  : category -> [message_ids]
+  - ./out/.topics_cache.json       : content_hash -> topic  (never delete — resumes across runs)
+  - updates ./out/stats.json       : adds .topics aggregated counts (merge)
+"""
+
+from __future__ import annotations
+
+import argparse
+import collections
+import hashlib
+import json
+import re
+import subprocess
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+# Reuse the pipeline's adapters + language classifier
+sys.path.insert(0, str(Path(__file__).parent))
+import analyze  # noqa: E402
+
+
+# ----------------------------------------------------------------------------
+# Topic categories — see plan.md §3.4
+# ----------------------------------------------------------------------------
+TOPIC_CATEGORIES = [
+    "install_help",       # asking how to install / deploy
+    "install_report",     # reporting install issue or sharing a fix
+    "provider_config",    # model provider setup or API key questions
+    "messaging_adapter",  # IM platform integration questions (Feishu / WeChat / etc.)
+    "feature_usage",      # using skills / memory / cron / subagents / MCP / etc.
+    "model_discussion",   # which model is best / benchmarks / comparisons
+    "community_meta",     # announcements, meetups, links to external content
+    "brand_identity",     # "is [X site] official?" / authenticity questions
+    "bug_report",         # reproducible technical issue
+    "feature_request",    # "I wish Hermes could..."
+    "success_story",      # showing off something they built
+    "general_discussion", # catch-all, including casual chat
+]
+
+# ----------------------------------------------------------------------------
+# Prompt construction
+# ----------------------------------------------------------------------------
+SYSTEM_PROMPT_HEADER = """\
+You are a Chinese/English-bilingual message classifier for the Nous Hermes Agent community chat.
+
+For each message in the input batch, assign exactly ONE primary topic from this list:
+  - install_help       : user is asking HOW to install / deploy Hermes Agent or a dependency
+  - install_report     : user is sharing an install experience, fix, or error
+  - provider_config    : questions or discussion about model provider setup / API keys / config
+  - messaging_adapter  : questions or discussion about IM platform integration (Feishu, WeChat, WeCom, DingTalk, Telegram, Discord-as-adapter, etc.)
+  - feature_usage      : using skills / memory / cron / subagents / MCP / browser / vision / etc.
+  - model_discussion   : comparing models, benchmarks, opinions about which LLM is best
+  - community_meta     : announcements, links to external content, meetups, events
+  - brand_identity     : asking whether a `.cn` site / WeChat group / other Chinese-language resource is official
+  - bug_report         : reporting a reproducible technical issue
+  - feature_request    : requesting a new feature or capability
+  - success_story      : showing off a workflow, demo, or success
+  - general_discussion : casual chat, greetings, off-topic, or anything that doesn't fit above
+
+OUTPUT FORMAT (STRICT):
+Return a JSON array. One element per input message. Each element has exactly:
+  {"id": "<message id as given>", "topic": "<one of the categories above>"}
+
+Do not include any other text, markdown, or explanation. Only the JSON array.
+
+Examples:
+  Input:  [{"id": "m1", "text": "怎么配置 kimi-coding-cn? 报错了 unauthorized"}]
+  Output: [{"id": "m1", "topic": "provider_config"}]
+
+  Input:  [{"id": "m2", "text": "有人在 hermes-agent.org.cn 上看过介绍吗？是官方的吗"}]
+  Output: [{"id": "m2", "topic": "brand_identity"}]
+"""
+
+
+def build_batch_prompt(batch: list[dict[str, str]]) -> str:
+    """Pair the system header with a batch of messages to classify."""
+    payload = json.dumps(batch, ensure_ascii=False)
+    return (
+        f"{SYSTEM_PROMPT_HEADER}\n"
+        f"Classify the following {len(batch)} message(s). "
+        f"Return exactly {len(batch)} elements in the output array, in the same order.\n\n"
+        f"Input:\n{payload}\n\n"
+        f"Output (JSON array only):"
+    )
+
+
+# ----------------------------------------------------------------------------
+# Hermes invocation
+# ----------------------------------------------------------------------------
+
+def call_hermes(prompt: str, provider: str | None = None, model: str | None = None,
+                timeout: int = 180) -> str:
+    """Shell out to `hermes chat -q ... --quiet`.
+
+    Returns the raw stdout (with the leading `session_id: ...` line stripped).
+    Raises subprocess.CalledProcessError or TimeoutExpired on failure.
+    """
+    cmd = [
+        "hermes", "chat",
+        "-q", prompt,
+        "--quiet",
+        "--ignore-rules",       # skip AGENTS.md / memory / skills injection
+        "--ignore-user-config", # skip custom config; use defaults from .env
+        "--max-turns", "1",     # single completion — no tool-calling loops
+        "--source", "tool",     # hide from user session list
+    ]
+    if provider:
+        cmd.extend(["--provider", provider])
+    if model:
+        cmd.extend(["--model", model])
+
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=True)
+    out = r.stdout
+
+    # Strip the "session_id: xxx" line(s) that --quiet still prints
+    lines = out.split("\n")
+    filtered = [l for l in lines if not l.startswith("session_id:")]
+    return "\n".join(filtered).strip()
+
+
+def parse_llm_response(raw: str, expected_ids: list[str]) -> dict[str, str] | None:
+    """Extract the JSON array from the model response and turn it into a dict.
+
+    Returns None on parse failure — caller decides whether to retry with a
+    smaller batch, fall back to a default topic, etc.
+    """
+    # Strip common wrappers: ```json ... ```, ``` ... ```
+    s = raw.strip()
+    fenced = re.match(r"```(?:json)?\s*(.*?)\s*```", s, re.DOTALL)
+    if fenced:
+        s = fenced.group(1).strip()
+
+    # Find the first [...] block — robust against models that add prose before/after
+    m = re.search(r"\[\s*\{.*?\}\s*\]", s, re.DOTALL)
+    if m:
+        s = m.group(0)
+
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(data, list):
+        return None
+
+    result: dict[str, str] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        mid = str(item.get("id", ""))
+        topic = str(item.get("topic", ""))
+        if topic not in TOPIC_CATEGORIES:
+            # Tolerate minor capitalization; fall back to general_discussion
+            topic_lc = topic.lower().strip()
+            if topic_lc in TOPIC_CATEGORIES:
+                topic = topic_lc
+            else:
+                topic = "general_discussion"
+        result[mid] = topic
+
+    # Return None if model didn't produce one topic per expected id
+    if not all(mid in result for mid in expected_ids):
+        return None
+
+    return result
+
+
+# ----------------------------------------------------------------------------
+# Cache
+# ----------------------------------------------------------------------------
+
+def content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+class TopicCache:
+    def __init__(self, path: Path):
+        self.path = path
+        self.data: dict[str, str] = {}
+        if path.exists():
+            try:
+                self.data = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                print(f"[cache] warning: {path} corrupt, starting fresh", file=sys.stderr)
+                self.data = {}
+
+    def get(self, text: str) -> str | None:
+        return self.data.get(content_hash(text))
+
+    def set(self, text: str, topic: str) -> None:
+        self.data[content_hash(text)] = topic
+
+    def save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
+
+
+# ----------------------------------------------------------------------------
+# Message loading (reuses analyze.py adapters)
+# ----------------------------------------------------------------------------
+
+def load_chinese_messages(chat_path: Path, platform: str, salt: str) -> list[analyze.Message]:
+    """Load messages, filter to zh + mixed."""
+    adapter = analyze.ADAPTERS[platform]
+    all_msgs = list(adapter(chat_path, salt))
+    zh_msgs = []
+    for m in all_msgs:
+        lang = analyze.classify_language(m.content)
+        if lang in ("zh", "mixed"):
+            zh_msgs.append(m)
+    return zh_msgs
+
+
+# ----------------------------------------------------------------------------
+# Main pipeline
+# ----------------------------------------------------------------------------
+
+def process_batch(
+    batch: list[analyze.Message],
+    provider: str | None,
+    model: str | None,
+    cache: TopicCache,
+    dry_run: bool,
+) -> dict[str, str]:
+    """Tag a single batch. Returns {message_id: topic}."""
+    # Cache lookup first — filter out already-tagged messages
+    to_tag: list[analyze.Message] = []
+    results: dict[str, str] = {}
+    for m in batch:
+        cached = cache.get(m.content)
+        if cached is not None:
+            results[m.message_id] = cached
+        else:
+            to_tag.append(m)
+
+    if not to_tag:
+        return results
+
+    if dry_run:
+        for m in to_tag:
+            results[m.message_id] = "general_discussion"
+        return results
+
+    # Truncate very long messages to avoid blowing context — we only need
+    # enough signal to classify, not full content
+    batch_payload = [
+        {"id": m.message_id, "text": m.content[:800]}
+        for m in to_tag
+    ]
+    prompt = build_batch_prompt(batch_payload)
+    expected_ids = [m.message_id for m in to_tag]
+
+    # Try once, retry once with smaller batch on parse failure
+    try:
+        raw = call_hermes(prompt, provider=provider, model=model)
+    except subprocess.TimeoutExpired:
+        print(f"[hermes] timeout on batch of {len(to_tag)}; marking all as general_discussion", file=sys.stderr)
+        for m in to_tag:
+            results[m.message_id] = "general_discussion"
+        return results
+    except subprocess.CalledProcessError as e:
+        print(f"[hermes] error on batch of {len(to_tag)}: {e.stderr[:500]}", file=sys.stderr)
+        for m in to_tag:
+            results[m.message_id] = "general_discussion"
+        return results
+
+    parsed = parse_llm_response(raw, expected_ids)
+
+    if parsed is None and len(to_tag) > 1:
+        # Retry each message individually — slower but more reliable
+        print(f"[parse] batch parse failed; retrying {len(to_tag)} individually", file=sys.stderr)
+        parsed = {}
+        for m in to_tag:
+            single_prompt = build_batch_prompt([{"id": m.message_id, "text": m.content[:800]}])
+            try:
+                single_raw = call_hermes(single_prompt, provider=provider, model=model)
+                single_parsed = parse_llm_response(single_raw, [m.message_id])
+                if single_parsed:
+                    parsed.update(single_parsed)
+                else:
+                    parsed[m.message_id] = "general_discussion"
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+                parsed[m.message_id] = "general_discussion"
+
+    if parsed is None:
+        parsed = {m.message_id: "general_discussion" for m in to_tag}
+
+    # Cache + merge
+    for m in to_tag:
+        topic = parsed.get(m.message_id, "general_discussion")
+        cache.set(m.content, topic)
+        results[m.message_id] = topic
+
+    return results
+
+
+def run(
+    chat_path: Path,
+    platform: str,
+    out_path: Path,
+    salt_path: Path,
+    batch_size: int = 25,
+    concurrency: int = 2,
+    provider: str | None = None,
+    model: str | None = None,
+    dry_run: bool = False,
+    limit: int | None = None,
+    stats_path: Path | None = None,
+) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path = out_path.parent / ".topics_cache.json"
+    cache = TopicCache(cache_path)
+
+    salt = analyze.ensure_salt(salt_path)
+    messages = load_chinese_messages(chat_path, platform, salt)
+    if limit:
+        messages = messages[:limit]
+
+    print(f"[topics] {len(messages)} Chinese/mixed messages to tag "
+          f"(cache has {len(cache.data)} entries)", file=sys.stderr)
+
+    # Build batches
+    batches = [messages[i:i + batch_size] for i in range(0, len(messages), batch_size)]
+    print(f"[topics] {len(batches)} batches of ≤{batch_size} messages", file=sys.stderr)
+
+    all_results: dict[str, str] = {}
+    start = time.time()
+
+    if concurrency <= 1:
+        for i, batch in enumerate(batches):
+            batch_results = process_batch(batch, provider, model, cache, dry_run)
+            all_results.update(batch_results)
+            cache.save()  # persist after each batch so Ctrl-C is safe
+            elapsed = time.time() - start
+            print(f"[topics] batch {i+1}/{len(batches)} done "
+                  f"({len(all_results)}/{len(messages)} msgs, {elapsed:.0f}s)",
+                  file=sys.stderr)
+    else:
+        with ThreadPoolExecutor(max_workers=concurrency) as ex:
+            futures = {ex.submit(process_batch, b, provider, model, cache, dry_run): i
+                       for i, b in enumerate(batches)}
+            for f in as_completed(futures):
+                batch_results = f.result()
+                all_results.update(batch_results)
+                cache.save()
+                elapsed = time.time() - start
+                print(f"[topics] one batch done "
+                      f"({len(all_results)}/{len(messages)} msgs, {elapsed:.0f}s)",
+                      file=sys.stderr)
+
+    # Write topics.json (message_id → topic)
+    topics_out = out_path.parent / "topics.json"
+    topics_out.write_text(json.dumps(all_results, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[write] {topics_out}", file=sys.stderr)
+
+    # Write topics_by_category.json (category → [message_ids])
+    by_cat: dict[str, list[str]] = collections.defaultdict(list)
+    for mid, topic in all_results.items():
+        by_cat[topic].append(mid)
+    by_cat_out = out_path.parent / "topics_by_category.json"
+    by_cat_out.write_text(
+        json.dumps({k: sorted(v) for k, v in by_cat.items()}, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
+    print(f"[write] {by_cat_out}", file=sys.stderr)
+
+    # Merge topic counts into stats.json if present
+    if stats_path is None:
+        stats_path = out_path.parent / "stats.json"
+    if stats_path.exists():
+        stats = json.loads(stats_path.read_text(encoding="utf-8"))
+        counts = collections.Counter(all_results.values())
+        stats["topics"] = {
+            "total_tagged": len(all_results),
+            "counts": dict(counts.most_common()),
+            "by_category": {k: len(v) for k, v in by_cat.items()},
+        }
+        stats_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[merge] updated {stats_path} with .topics section", file=sys.stderr)
+
+        # Re-render report.md so §9b shows real data
+        template_path = Path(__file__).parent / "report-template.md"
+        report_path = stats_path.parent / "report.md"
+        if template_path.exists():
+            report_md = analyze.render_report(template_path, stats)
+            report_path.write_text(report_md, encoding="utf-8")
+            print(f"[re-render] {report_path} with topics", file=sys.stderr)
+
+    elapsed = time.time() - start
+    print(f"[done] tagged {len(all_results)} messages in {elapsed:.0f}s", file=sys.stderr)
+
+
+# ----------------------------------------------------------------------------
+# CLI
+# ----------------------------------------------------------------------------
+
+def main() -> int:
+    p = argparse.ArgumentParser(description="LLM topic-tagging pass for Nous Chinese chat analysis.")
+    p.add_argument("--input-chat", required=True, type=Path,
+                   help="Chat export JSON (same file used with analyze.py)")
+    p.add_argument("--platform", required=True, choices=list(analyze.ADAPTERS.keys()))
+    p.add_argument("--out", type=Path, default=Path("./out/topics.json"),
+                   help="Output path for topics.json (default: ./out/topics.json)")
+    p.add_argument("--salt-file", type=Path,
+                   default=Path(__file__).parent / "user_hash_salt.key")
+    p.add_argument("--stats-path", type=Path, default=None,
+                   help="Path to stats.json to merge .topics into (default: <out>/stats.json)")
+    p.add_argument("--batch-size", type=int, default=25,
+                   help="Messages per Hermes call (default: 25)")
+    p.add_argument("--concurrency", type=int, default=1,
+                   help="Parallel Hermes subprocesses (default: 1 — sequential)")
+    p.add_argument("--provider", type=str, default=None,
+                   help="Hermes --provider override (default: whatever user has configured)")
+    p.add_argument("--model", type=str, default=None,
+                   help="Hermes --model override")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Don't call Hermes; tag everything as general_discussion (for pipeline shape testing)")
+    p.add_argument("--limit", type=int, default=None,
+                   help="Only process the first N Chinese messages (for testing / cost-capping)")
+    args = p.parse_args()
+
+    # Check hermes is available unless dry-run
+    if not args.dry_run:
+        try:
+            r = subprocess.run(["hermes", "--version"], capture_output=True, text=True, timeout=10)
+            if r.returncode != 0:
+                print("[error] `hermes --version` failed. Is Hermes Agent installed and on PATH?",
+                      file=sys.stderr)
+                return 2
+            print(f"[hermes] {r.stdout.strip().splitlines()[0] if r.stdout else 'found'}",
+                  file=sys.stderr)
+        except FileNotFoundError:
+            print("[error] `hermes` not found on PATH. Install Hermes Agent first.", file=sys.stderr)
+            return 2
+        except subprocess.TimeoutExpired:
+            print("[error] `hermes --version` timed out. Hermes may be misconfigured.", file=sys.stderr)
+            return 2
+
+    run(
+        chat_path=args.input_chat,
+        platform=args.platform,
+        out_path=args.out,
+        salt_path=args.salt_file,
+        batch_size=args.batch_size,
+        concurrency=args.concurrency,
+        provider=args.provider,
+        model=args.model,
+        dry_run=args.dry_run,
+        limit=args.limit,
+        stats_path=args.stats_path,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
