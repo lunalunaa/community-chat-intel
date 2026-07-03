@@ -6,11 +6,21 @@ normalized canonical JSON), produces:
   - users.json : per-user profiles (hashed ids)
   - report.md  : report-template.md with stats placeholders filled in
 
+Works for any target-language / region community — not just Chinese. Pick a
+target language and region with `--target-language` / `--region` (see
+`languages.py` for the full list, or add your own language/region profile
+there). Defaults to `zh` / `cn` for backward compatibility with existing
+configs; pass `--target-language none` to disable language classification
+entirely (every message counts as "target" — useful for already-monolingual
+exports where you don't need the cohort split).
+
 Usage:
     python analyze.py \\
         --input path/to/export.json \\
         --platform discord \\
         --out ./out/ \\
+        [--target-language ja] \\
+        [--region jp] \\
         [--template ./report-template.md] \\
         [--salt-file ./user_hash_salt.key] \\
         [--channels "#general,#help"] \\
@@ -20,10 +30,10 @@ Usage:
 
 The pipeline stages:
   1. Load adapter (platform-specific → canonical schema)
-  2. Language classify each message
+  2. Language classify each message (per --target-language profile)
   3. Build per-user profiles
   4. Keyword extraction (providers, competitors, messaging, features, friction, shadow, acquisition)
-  5. Question detection + reply-graph for help-answered-rate
+  5. Question detection (per --target-language patterns) + reply-graph for help-answered-rate
   6. Retention cohort assignment
   7. Aggregate stats
   8. Write outputs
@@ -46,6 +56,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import keywords as kw  # local keywords.py
+import languages as lang  # local languages.py
 
 # ----------------------------------------------------------------------------
 # Canonical message schema
@@ -557,35 +568,26 @@ def _parse_ts(s: str) -> datetime:
 # Stage 2 — language classification
 # ----------------------------------------------------------------------------
 
-def classify_language(text: str, threshold: float = kw.DEFAULT_CJK_THRESHOLD) -> str:
-    """Return one of: 'zh', 'en', 'mixed', 'unknown'.
+def classify_language(text: str, language_profile: lang.LanguageProfile | None) -> str:
+    """Return one of: 'target', 'other', 'mixed', 'unknown'.
 
-    Heuristics designed for Chinese tech discussion, where messages routinely
-    mix Chinese prose with ASCII product names, CLI commands, and API snippets:
+    `language_profile=None` means language classification is disabled (every
+    non-empty message counts as 'target') — use `--target-language none` for
+    already-monolingual exports where the language-cohort split isn't useful.
 
-    - ratio ≥ 0.7: "zh"
-    - ratio ≥ threshold (default 0.30): "mixed"
-    - < threshold but has ≥ 3 CJK chars AND overall length ≥ 20: "mixed"
-      (captures tech-heavy code-switched Chinese, e.g. "怎么配置 kimi-coding-cn? 报错了 unauthorized")
-    - otherwise if length ≥ 5: "en"
-    - otherwise: "unknown"
+    Otherwise delegates to `languages.classify_language()`, which generalizes
+    the original CJK-ratio heuristic to any registered language profile
+    (script-ratio detection for CJK/Cyrillic/Arabic/etc., stopword-ratio for
+    Latin-script languages).
     """
-    stripped = text.strip()
-    if not stripped:
-        return "unknown"
-    ratio = kw.cjk_ratio(text)
-    cjk_count = sum(1 for c in stripped if kw.CJK_PATTERN.match(c))
-
-    if ratio >= 0.7:
-        return "zh"
-    if ratio >= threshold:
-        return "mixed"
-    if cjk_count >= 3 and len(stripped) >= 20:
-        # Heavily code-switched but still Chinese-author content
-        return "mixed"
-    if len(stripped) < 5:
-        return "unknown"
-    return "en"
+    if language_profile is None:
+        return "unknown" if not text.strip() else "target"
+    result = lang.classify_language(text, language_profile)
+    # languages.classify_language() returns 'target'/'mixed'/'other'/'unknown'
+    # directly — no translation needed, kept as a thin wrapper for backward
+    # compatibility with the old classify_language(text, threshold) signature
+    # some callers may still expect a single-text-arg call.
+    return result
 
 
 # ----------------------------------------------------------------------------
@@ -599,9 +601,9 @@ class UserProfile:
     first_seen: datetime
     last_seen: datetime
     message_count: int = 0
-    zh_count: int = 0
+    target_lang_count: int = 0
     mixed_count: int = 0
-    en_count: int = 0
+    other_lang_count: int = 0
     hours_of_day: collections.Counter = field(default_factory=collections.Counter)
     channels: set[str] = field(default_factory=set)
     # Keyword hits
@@ -620,18 +622,24 @@ class UserProfile:
     replies_given: int = 0
 
     def language_primary(self) -> str:
-        """Primary language classification for this user."""
+        """Primary language classification for this user.
+
+        Returns one of: 'silent', 'target_primary', 'other_primary', 'bilingual'.
+        ('target_primary'/'other_primary' replace the old 'zh_primary'/
+        'en_primary' labels — generalized to any target language, not just
+        Chinese. 'silent' means the user posted nothing usable to classify.)
+        """
         if self.message_count == 0:
             return "silent"
-        total = self.zh_count + self.mixed_count + self.en_count
+        total = self.target_lang_count + self.mixed_count + self.other_lang_count
         if total == 0:
             return "silent"
-        zh_pct = (self.zh_count + 0.5 * self.mixed_count) / total
-        en_pct = (self.en_count + 0.5 * self.mixed_count) / total
-        if zh_pct >= 0.7:
-            return "zh_primary"
-        if en_pct >= 0.7:
-            return "en_primary"
+        target_pct = (self.target_lang_count + 0.5 * self.mixed_count) / total
+        other_pct = (self.other_lang_count + 0.5 * self.mixed_count) / total
+        if target_pct >= 0.7:
+            return "target_primary"
+        if other_pct >= 0.7:
+            return "other_primary"
         return "bilingual"
 
 
@@ -645,7 +653,7 @@ def extract_urls(text: str) -> list[str]:
 
 def classify_url(url: str) -> tuple[str, str]:
     """Return (category, domain). Categories: official, impersonator, hf, modelscope,
-    chinese_vendor, competitor_vendor, messaging, other."""
+    regional_vendor, messaging, other."""
     url_l = url.lower()
     domain = re.sub(r"^https?://", "", url_l).split("/")[0]
     for d in kw.IMPERSONATOR_DOMAINS:
@@ -658,25 +666,28 @@ def classify_url(url: str) -> tuple[str, str]:
         return ("hf", domain)
     if "modelscope" in domain:
         return ("modelscope", domain)
-    chinese_vendor_domains = [
+    # Vendor domains associated with region-specific model providers (currently
+    # covers the Chinese-market provider set; extend/edit for other regions).
+    regional_vendor_domains = [
         "volcengine.com", "bytedance.com", "deepseek.com", "moonshot.cn",
         "kimi.cn", "zhipuai.cn", "bigmodel.cn", "aliyun.com", "bailian",
         "minimaxi.com", "minimax.com", "baidu.com", "tencent.com",
-        "stepfun.com", "xiaomi.com",
+        "stepfun.com", "xiaomi.com", "yandex.ru", "yandex.com",
     ]
-    for d in chinese_vendor_domains:
+    for d in regional_vendor_domains:
         if d in domain:
-            return ("chinese_vendor", domain)
+            return ("regional_vendor", domain)
     messaging_domains = ["feishu.cn", "larksuite.com", "wechat.com", "weixin.qq",
-                          "dingtalk.com", "qq.com", "telegram.", "discord."]
+                          "dingtalk.com", "qq.com", "telegram.", "discord.",
+                          "vk.com", "line.me", "kakao.com"]
     for d in messaging_domains:
         if d in domain:
             return ("messaging", domain)
     return ("other", domain)
 
 
-def is_question(text: str) -> bool:
-    return bool(kw.QUESTION_PATTERN.search(text))
+def is_question(text: str, question_pattern: re.Pattern) -> bool:
+    return bool(question_pattern.search(text))
 
 
 # ----------------------------------------------------------------------------
@@ -689,11 +700,24 @@ def run_pipeline(
     since: datetime | None = None,
     until: datetime | None = None,
     verbose: bool = False,
+    language_profile: lang.LanguageProfile | None = None,
+    region_profile: lang.RegionProfile | None = None,
 ) -> tuple[dict[str, UserProfile], dict[str, Any]]:
+    """Run the full analysis pipeline.
+
+    `language_profile=None` disables language classification (every message
+    counts as target-language; useful for already-monolingual exports).
+    `region_profile=None` falls back to the "global" region profile (English-
+    default shadow-community platforms + generic timezone buckets).
+    """
+    region_profile = region_profile or lang.get_region_profile("global")
+    shadow_compiled = kw.compile_keyword_dict(region_profile.shadow_community)
+    question_pattern = kw.question_pattern_for(language_profile.code if language_profile else None)
+
     users: dict[str, UserProfile] = {}
     lang_counts = collections.Counter()
     channel_counts = collections.Counter()
-    channel_zh_counts = collections.Counter()
+    channel_target_counts = collections.Counter()
     provider_counts = collections.Counter()
     competitor_counts = collections.Counter()
     messaging_counts = collections.Counter()
@@ -707,8 +731,8 @@ def run_pipeline(
     url_category_counts = collections.Counter()
     url_domain_counts = collections.Counter()
     question_count = 0
-    zh_question_count = 0
-    zh_question_answered = 0
+    target_question_count = 0
+    target_question_answered = 0
 
     # For help-answered-rate: build message_id → reply children
     reply_children: dict[str, list[Message]] = collections.defaultdict(list)
@@ -737,10 +761,10 @@ def run_pipeline(
     # Second pass — per-message extraction
     for m in filtered:
         channel_counts[m.channel] += 1
-        lang = classify_language(m.content)
-        lang_counts[lang] += 1
-        if lang in ("zh", "mixed"):
-            channel_zh_counts[m.channel] += 1
+        msg_lang = classify_language(m.content, language_profile)
+        lang_counts[msg_lang] += 1
+        if msg_lang in ("target", "mixed"):
+            channel_target_counts[m.channel] += 1
 
         # User profile
         user = users.get(m.author_id)
@@ -757,12 +781,12 @@ def run_pipeline(
         user.message_count += 1
         user.hours_of_day[m.timestamp.hour] += 1
         user.channels.add(m.channel)
-        if lang == "zh":
-            user.zh_count += 1
-        elif lang == "mixed":
+        if msg_lang == "target":
+            user.target_lang_count += 1
+        elif msg_lang == "mixed":
             user.mixed_count += 1
-        elif lang == "en":
-            user.en_count += 1
+        elif msg_lang == "other":
+            user.other_lang_count += 1
 
         # Replies
         if m.reply_to_message_id:
@@ -788,7 +812,7 @@ def run_pipeline(
         for label in kw.match_any(content, kw.FRICTION_COMPILED):
             user.friction[label] += 1
             friction_counts[label] += 1
-        for label in kw.match_any(content, kw.SHADOW_COMMUNITY_COMPILED):
+        for label in kw.match_any(content, shadow_compiled):
             user.shadow_community[label] += 1
             shadow_counts[label] += 1
         for label in kw.match_any(content, kw.ACQUISITION_COMPILED):
@@ -816,53 +840,55 @@ def run_pipeline(
                 impersonator_domain_counts[imp_domain] += 1
 
         # Questions
-        if is_question(content):
+        if is_question(content, question_pattern):
             question_count += 1
             user.questions_asked += 1
-            if lang in ("zh", "mixed"):
-                zh_question_count += 1
+            if msg_lang in ("target", "mixed"):
+                target_question_count += 1
                 # Answered if any reply within 48h
                 children = reply_children.get(m.message_id, [])
                 for child in children:
                     if (child.timestamp - m.timestamp) <= timedelta(hours=48):
-                        zh_question_answered += 1
+                        target_question_answered += 1
                         break
 
     # Aggregate stats object
-    zh_users = [u for u in users.values() if u.language_primary() in ("zh_primary", "bilingual")]
-    zh_primary_users = [u for u in users.values() if u.language_primary() == "zh_primary"]
+    target_users = [u for u in users.values() if u.language_primary() in ("target_primary", "bilingual")]
+    target_primary_users = [u for u in users.values() if u.language_primary() == "target_primary"]
 
     # Retention cohorts
     now = max((m.timestamp for m in filtered), default=datetime.now(tz=timezone.utc))
     active_cutoff = now - timedelta(days=30)
     lapsed_cutoff = now - timedelta(days=90)
-    active = [u for u in zh_users if u.last_seen >= active_cutoff]
-    recently_lapsed = [u for u in zh_users if active_cutoff > u.last_seen >= lapsed_cutoff]
-    long_lapsed = [u for u in zh_users if u.last_seen < lapsed_cutoff]
-    one_time = [u for u in zh_users if u.message_count == 1]
+    active = [u for u in target_users if u.last_seen >= active_cutoff]
+    recently_lapsed = [u for u in target_users if active_cutoff > u.last_seen >= lapsed_cutoff]
+    long_lapsed = [u for u in target_users if u.last_seen < lapsed_cutoff]
+    one_time = [u for u in target_users if u.message_count == 1]
 
-    # Timezone proxy — modal hour of posting per user (UTC), → UTC+8 for mainland
+    # Location proxy — modal hour of posting per user (UTC), bucketed per the
+    # active region profile's timezone_buckets (see languages.py).
     def modal_hour(u: UserProfile) -> int | None:
         if not u.hours_of_day:
             return None
         return u.hours_of_day.most_common(1)[0][0]
 
+    def bucket_hour(h: int) -> str:
+        for label, (lo, hi) in region_profile.timezone_buckets.items():
+            if lo <= hi:
+                if lo <= h <= hi:
+                    return label
+            else:
+                # wrapping range (e.g. 22-3 meaning 22,23,0,1,2,3)
+                if h >= lo or h <= hi:
+                    return label
+        return "other"
+
     tz_buckets = collections.Counter()
-    for u in zh_users:
+    for u in target_users:
         h = modal_hour(u)
         if h is None:
             continue
-        # Mainland peak = UTC 12-16 (evening 20-24 Beijing)
-        # N.America peak = UTC 0-6 (evening 16-22 PT / 20-02 ET)
-        # Europe peak = UTC 18-22 (evening 20-24 CET)
-        if 12 <= h <= 16:
-            tz_buckets["mainland_evening"] += 1
-        elif h in (0, 1, 2, 3, 4, 5, 6):
-            tz_buckets["na_evening"] += 1
-        elif 18 <= h <= 22:
-            tz_buckets["eu_evening"] += 1
-        else:
-            tz_buckets["other"] += 1
+        tz_buckets[bucket_hour(h)] += 1
 
     stats = {
         "metadata": {
@@ -870,23 +896,38 @@ def run_pipeline(
             "total_messages": len(filtered),
             "channels": sorted(channel_counts.keys()),
             "channel_message_counts": dict(channel_counts),
-            "channel_zh_message_counts": dict(channel_zh_counts),
+            "channel_target_message_counts": dict(channel_target_counts),
+            # Back-compat alias for the original Chinese-specific key name
+            "channel_zh_message_counts": dict(channel_target_counts),
             "date_range": [
                 min((m.timestamp for m in filtered), default=None).isoformat() if filtered else None,
                 max((m.timestamp for m in filtered), default=None).isoformat() if filtered else None,
             ],
-            "pipeline_version": "0.1.0",
+            "target_language": language_profile.code if language_profile else None,
+            "target_language_name": language_profile.name if language_profile else None,
+            "region": region_profile.code,
+            "region_name": region_profile.name,
+            "pipeline_version": "0.2.0",
         },
         "language_distribution": dict(lang_counts),
         "users": {
             "total": len(users),
-            "zh_primary": len(zh_primary_users),
+            "target_primary": len(target_primary_users),
             "bilingual": sum(1 for u in users.values() if u.language_primary() == "bilingual"),
-            "en_primary": sum(1 for u in users.values() if u.language_primary() == "en_primary"),
+            "other_primary": sum(1 for u in users.values() if u.language_primary() == "other_primary"),
             "silent_or_unclassified": sum(1 for u in users.values() if u.language_primary() == "silent"),
-            "zh_plus_bilingual": len(zh_users),
+            "target_plus_bilingual": len(target_users),
+            # Back-compat aliases (original Chinese-specific key names)
+            "zh_primary": len(target_primary_users),
+            "en_primary": sum(1 for u in users.values() if u.language_primary() == "other_primary"),
+            "zh_plus_bilingual": len(target_users),
         },
         "retention": {
+            "target_active_30d": len(active),
+            "target_lapsed_30_90d": len(recently_lapsed),
+            "target_lapsed_90d_plus": len(long_lapsed),
+            "target_one_time_posters": len(one_time),
+            # Back-compat aliases
             "zh_active_30d": len(active),
             "zh_lapsed_30_90d": len(recently_lapsed),
             "zh_lapsed_90d_plus": len(long_lapsed),
@@ -909,13 +950,18 @@ def run_pipeline(
         },
         "help_answered": {
             "total_questions": question_count,
-            "zh_questions": zh_question_count,
-            "zh_questions_answered_within_48h": zh_question_answered,
-            "zh_answered_rate": (zh_question_answered / zh_question_count) if zh_question_count else None,
+            "target_questions": target_question_count,
+            "target_questions_answered_within_48h": target_question_answered,
+            "target_answered_rate": (target_question_answered / target_question_count) if target_question_count else None,
+            # Back-compat aliases
+            "zh_questions": target_question_count,
+            "zh_questions_answered_within_48h": target_question_answered,
+            "zh_answered_rate": (target_question_answered / target_question_count) if target_question_count else None,
         },
     }
 
     return users, stats
+
 
 
 # ----------------------------------------------------------------------------
@@ -987,6 +1033,18 @@ def main() -> int:
     parser.add_argument("--input", required=True, type=Path, help="Path to chat export JSON")
     parser.add_argument("--platform", required=True, choices=list(ADAPTERS.keys()))
     parser.add_argument("--out", type=Path, default=Path("./out"), help="Output directory")
+    parser.add_argument("--target-language", type=str, default="zh",
+                        help="Language code to treat as the 'target' cohort for classification "
+                             "(see languages.py LANGUAGE_PROFILES for the full list: zh, ja, ko, "
+                             "ru, ar, he, th, vi, es, fr, de, pt, id, ...). "
+                             "Pass 'none' to disable language classification entirely — every "
+                             "message counts as target (useful for already-monolingual exports). "
+                             "Default: zh (backward-compatible with the original Chinese-focused build).")
+    parser.add_argument("--region", type=str, default="cn",
+                        help="Region code controlling shadow-community platforms and the "
+                             "timezone-proxy location buckets (see languages.py REGION_PROFILES: "
+                             "cn, jp, kr, ru, latam, mena, global, ...). Unknown codes fall back "
+                             "to 'global'. Default: cn (backward-compatible).")
     parser.add_argument("--template", type=Path, default=Path(__file__).parent / "report-template.md")
     parser.add_argument("--salt-file", type=Path, default=Path(__file__).parent / "user_hash_salt.key")
     parser.add_argument("--channels", type=str, default=None, help="Comma-separated channel names to include")
@@ -1000,6 +1058,17 @@ def main() -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
 
+    language_profile = lang.get_language_profile(args.target_language)
+    if args.target_language not in (None, "none", "off") and language_profile is None:
+        print(f"[warn] unknown --target-language '{args.target_language}'; "
+              f"known codes: {', '.join(sorted(lang.LANGUAGE_PROFILES))}. "
+              f"Falling back to no language classification.", file=sys.stderr)
+    region_profile = lang.get_region_profile(args.region)
+    if args.region not in lang.REGION_PROFILES:
+        print(f"[warn] unknown --region '{args.region}'; "
+              f"known codes: {', '.join(sorted(lang.REGION_PROFILES))}. "
+              f"Falling back to 'global'.", file=sys.stderr)
+
     salt = ensure_salt(args.salt_file)
     adapter = ADAPTERS[args.platform]
     # Lark adapter accepts an optional `channel` kwarg; others don't.
@@ -1010,6 +1079,7 @@ def main() -> int:
 
     if args.verbose:
         print(f"[load] {len(messages)} messages from {args.platform} export", file=sys.stderr)
+        print(f"[config] target_language={args.target_language} region={args.region}", file=sys.stderr)
 
     channels_filter = {c.strip() for c in args.channels.split(",")} if args.channels else None
     since = datetime.fromisoformat(args.since).replace(tzinfo=timezone.utc) if args.since else None
@@ -1021,7 +1091,10 @@ def main() -> int:
         since=since,
         until=until,
         verbose=args.verbose,
+        language_profile=language_profile,
+        region_profile=region_profile,
     )
+
 
     # Write stats.json
     stats_path = args.out / "stats.json"

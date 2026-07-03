@@ -2,22 +2,27 @@
 
 Each dictionary maps a canonical label → a list of pattern strings.
 Patterns are matched case-insensitively as whole-word / whole-phrase regex.
-CJK terms match verbatim; ASCII terms match as word-boundaries.
+Non-ASCII terms (any script — CJK, Cyrillic, Arabic, etc.) match verbatim;
+ASCII terms match as word-boundaries.
 
 Used by analyze.py's keyword-extraction stage.
 
 CUSTOMIZE THIS FILE for your own product/community: swap PRODUCT_FEATURES,
 IMPERSONATOR_DOMAINS, OFFICIAL_DOMAINS, and COMPETITORS for your own.
-Everything below (except those four) is generic — real LLM providers, real
-messaging platforms, real Chinese content platforms — and should work
-out of the box for most AI-product communities.
+Everything else here — LLM providers, messaging platforms, friction signals —
+is generic and should work out of the box for most AI-product communities in
+any language/region. Region-specific "where else do people hang out" and
+timezone-proxy logic live in `languages.py`'s REGION_PROFILES instead of here,
+since those genuinely vary by target region.
 """
 
 from __future__ import annotations
 import re
 
 # ----------------------------------------------------------------------------
-# 1. Model providers — who do Chinese users name when they talk about LLMs?
+# 1. Model providers — who do users name when they talk about LLMs? Includes
+#    both global/Western providers and several Chinese-market providers,
+#    since AI-product communities worldwide tend to mention both.
 # ----------------------------------------------------------------------------
 PROVIDERS: dict[str, list[str]] = {
     # Chinese providers
@@ -34,6 +39,7 @@ PROVIDERS: dict[str, list[str]] = {
     "anthropic_claude": ["claude", "anthropic", "sonnet", "opus"],
     "openai": ["openai", "chatgpt", "gpt-4", "gpt-5", "codex"],
     "gemini_google": ["gemini", "google ai", "bard"],
+    "yandexgpt": ["yandexgpt", "yandex gpt", "яндексgpt"],
     # Aggregators and self-host
     "openrouter": ["openrouter", "or-"],
     "huggingface": ["huggingface", "hf", "🤗", "抱抱脸"],
@@ -147,27 +153,9 @@ OFFICIAL_DOMAINS: list[str] = [
 ]
 
 # ----------------------------------------------------------------------------
-# 8. Shadow-community markers — where else do users hang out?
-# ----------------------------------------------------------------------------
-SHADOW_COMMUNITY: dict[str, list[str]] = {
-    "zhihu": ["zhihu", "知乎", "zhuanlan"],
-    "wechat_oa": ["公众号", "微信公众号", "official account"],
-    "wechat_group": ["微信群", "wechat group"],
-    "qq_group": ["qq群", "qq group"],
-    "feishu_group": ["飞书群", "feishu group"],
-    "bilibili": ["bilibili", "b站", "哔哩哔哩"],
-    "xiaohongshu": ["xiaohongshu", "小红书", "rednote"],
-    "juejin": ["juejin", "掘金"],
-    "csdn": ["csdn"],
-    "cnblogs": ["cnblogs", "博客园"],
-    "segmentfault": ["segmentfault", "思否"],
-    "douyin_tiktok": ["douyin", "抖音", "tiktok"],
-    "baidu_baike": ["baidu", "百度", "baike"],
-    "github_discussions": ["github discussions", "github issues"],
-}
-
-# ----------------------------------------------------------------------------
-# 9. Acquisition-channel markers — where did users say they found the product?
+# 8. Acquisition-channel markers — where did users say they found the product?
+#    (Shadow-community markers moved to languages.py's REGION_PROFILES since
+#    "where else do people hang out" is region-specific, not universal.)
 # ----------------------------------------------------------------------------
 ACQUISITION: dict[str, list[str]] = {
     "twitter_x": ["twitter", " x.com", "推特"],
@@ -181,26 +169,53 @@ ACQUISITION: dict[str, list[str]] = {
 }
 
 # ----------------------------------------------------------------------------
-# 10. Language detection — CJK ratio threshold
-# ----------------------------------------------------------------------------
-CJK_PATTERN = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
-# default: a message is "Chinese" if ≥30% of non-whitespace chars are CJK
-DEFAULT_CJK_THRESHOLD = 0.30
-
-# ----------------------------------------------------------------------------
 # URL extraction
 # ----------------------------------------------------------------------------
 URL_PATTERN = re.compile(r"https?://[^\s)\]>,'\"]+", re.IGNORECASE)
 
 # ----------------------------------------------------------------------------
-# Question detection — simple first-pass heuristic
+# Question detection — per-language heuristics. English is always checked;
+# add an entry here (keyed by the same language code used in languages.py)
+# for additional target-language question markers. Unknown language codes
+# fall back to English-only detection.
 # ----------------------------------------------------------------------------
-QUESTION_PATTERN = re.compile(
-    r"[?？]\s*$|"
-    r"\b(how|what|when|where|why|which|who|is it|can i|can you|does|do i|should i)\b|"
-    r"(怎么|怎样|如何|什么|为什么|可以吗|能不能|吗\s*[？?]?\s*$|呢\s*[？?]?\s*$)",
+QUESTION_PATTERN_EN = re.compile(
+    r"[?]\s*$|\b(how|what|when|where|why|which|who|is it|can i|can you|does|do i|should i)\b",
     re.IGNORECASE,
 )
+
+QUESTION_PATTERNS_BY_LANGUAGE: dict[str, re.Pattern] = {
+    "zh": re.compile(
+        r"[？?]\s*$|怎么|怎样|如何|什么|为什么|可以吗|能不能|吗\s*[？?]?\s*$|呢\s*[？?]?\s*$"
+    ),
+    "ja": re.compile(r"[？?]\s*$|どう|なぜ|何|ですか\s*[？?]?\s*$|ますか\s*[？?]?\s*$"),
+    "ko": re.compile(r"[？?]\s*$|어떻게|왜|무엇|인가요\s*[？?]?\s*$|나요\s*[？?]?\s*$"),
+    "ru": re.compile(r"[?]\s*$|как\b|почему\b|что\b|где\b|можно ли\b", re.IGNORECASE),
+    "es": re.compile(r"[?¿]\s*$|\bcómo\b|\bqué\b|\bpor qué\b|\bcuándo\b|\bdónde\b", re.IGNORECASE),
+    "fr": re.compile(r"[?]\s*$|\bcomment\b|\bpourquoi\b|\bquoi\b|\bquand\b|\boù\b", re.IGNORECASE),
+    "de": re.compile(r"[?]\s*$|\bwie\b|\bwarum\b|\bwas\b|\bwann\b|\bwo\b", re.IGNORECASE),
+    "pt": re.compile(r"[?]\s*$|\bcomo\b|\bpor que\b|\bquando\b|\bonde\b", re.IGNORECASE),
+    "ar": re.compile(r"[؟?]\s*$|كيف|لماذا|ماذا|متى|أين"),
+}
+
+
+def question_pattern_for(language_code: str | None) -> re.Pattern:
+    """Return the compiled question-detection pattern for a target language.
+
+    Always includes the English pattern (most communities code-switch into
+    English for technical terms). Falls back to English-only when the
+    language code has no dedicated pattern registered above.
+    """
+    lang_pat = QUESTION_PATTERNS_BY_LANGUAGE.get(language_code or "")
+    if lang_pat is None:
+        return QUESTION_PATTERN_EN
+    combined = f"(?:{QUESTION_PATTERN_EN.pattern})|(?:{lang_pat.pattern})"
+    return re.compile(combined, re.IGNORECASE)
+
+
+# Backward-compatible default (English + Chinese) for callers that don't pass
+# a language code.
+QUESTION_PATTERN = question_pattern_for("zh")
 
 # ----------------------------------------------------------------------------
 # Compile helpers
@@ -215,8 +230,8 @@ def _compile_dict(d: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
             if p.startswith(r"\b") or p.startswith(r"("):
                 # already a regex
                 compiled_patterns.append(re.compile(p, re.IGNORECASE))
-            elif CJK_PATTERN.search(p):
-                # CJK — verbatim substring match, no word boundaries
+            elif re.search(r"[^\x00-\x7f]", p):
+                # non-ASCII (any script) — verbatim substring match, no word boundaries
                 compiled_patterns.append(re.compile(re.escape(p), re.IGNORECASE))
             else:
                 # ASCII — word boundary
@@ -225,13 +240,16 @@ def _compile_dict(d: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
     return compiled
 
 
+# Public alias — languages.py's REGION_PROFILES.shadow_community dicts use
+# this same compile helper (kept public rather than importing a private name).
+compile_keyword_dict = _compile_dict
+
 PROVIDERS_COMPILED = _compile_dict(PROVIDERS)
 COMPETITORS_COMPILED = _compile_dict(COMPETITORS)
 MESSAGING_COMPILED = _compile_dict(MESSAGING)
 PRODUCT_FEATURES_COMPILED = _compile_dict(PRODUCT_FEATURES)
 INSTALL_COMPILED = _compile_dict(INSTALL)
 FRICTION_COMPILED = _compile_dict(FRICTION)
-SHADOW_COMMUNITY_COMPILED = _compile_dict(SHADOW_COMMUNITY)
 ACQUISITION_COMPILED = _compile_dict(ACQUISITION)
 
 
@@ -245,11 +263,3 @@ def match_any(text: str, compiled: dict[str, list[re.Pattern]]) -> list[str]:
                 break
     return hits
 
-
-def cjk_ratio(text: str) -> float:
-    """Fraction of non-whitespace chars that are CJK."""
-    stripped = "".join(text.split())
-    if not stripped:
-        return 0.0
-    cjk = sum(1 for c in stripped if CJK_PATTERN.match(c))
-    return cjk / len(stripped)

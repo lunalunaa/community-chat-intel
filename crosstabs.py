@@ -4,9 +4,11 @@ Loads `users.json` (produced by analyze.py) and computes decision-relevant
 pivots:
 
   1. Provider cluster × Location proxy
-     → Do mainland users lean on Chinese providers more than overseas?
+     → Do users in the region's primary geography lean on regional providers
+       more than those in other geographies?
   2. Messaging platform × Location
-     → Does a given IM-platform's demand concentrate in mainland / overseas / both?
+     → Does a given IM-platform's demand concentrate in one geography or
+       spread across several?
   3. Feature depth × Retention
      → Do users who engage with your product's differentiator features retain better?
   4. Install path × Friction
@@ -18,13 +20,19 @@ pivots:
   7. Acquisition channel × Retention
      → Which acquisition channels produce sticky users?
 
+Works for any target language/region — pass `--region` to pick which
+REGION_PROFILE's timezone buckets and provider clusters apply (see
+languages.py; defaults to `cn` for backward compatibility). The cohort
+pivoted on is "target_primary + bilingual" users as classified by analyze.py
+for whichever `--target-language` you used there.
+
 Output:
   - crosstabs.json : all pivots as nested {row: {col: count}} dicts
   - crosstabs.md   : human-readable markdown tables, ready to paste into report.md §14
   - merges into stats.json as .crosstabs
 
 USAGE:
-  python3 crosstabs.py --users-json ./out/users.json --out ./out/crosstabs.json [--stats-path ./out/stats.json]
+  python3 crosstabs.py --users-json ./out/users.json --region jp --out ./out/crosstabs.json [--stats-path ./out/stats.json]
 """
 
 from __future__ import annotations
@@ -37,23 +45,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import languages as lang  # local languages.py
+
 # ----------------------------------------------------------------------------
 # Category definitions — how we collapse per-user counters into pivot axes
 # ----------------------------------------------------------------------------
 
-# Provider clusters — aggregate the provider labels into strategic buckets
-PROVIDER_CLUSTERS = {
-    "chinese_api": {
-        "deepseek",
-        "kimi_moonshot",
-        "qwen_alibaba",
-        "glm_zhipu",
-        "minimax",
-        "volcengine_ark",
-        "doubao",
-        "baichuan",
-        "yi_01ai",
-    },
+# Provider clusters — aggregate the provider labels into strategic buckets.
+# "regional_api" membership comes from the active RegionProfile.regional_providers
+# (see languages.py) so this generalizes beyond the Chinese-market provider set.
+GLOBAL_PROVIDER_CLUSTERS = {
     "western_api": {"anthropic_claude", "openai", "gemini_google"},
     "aggregator_or_portal": {"openrouter", "huggingface", "modelscope"},
     "self_hosted": {"ollama", "vllm", "llamacpp", "lmstudio"},
@@ -101,11 +102,19 @@ def nonzero(d: dict) -> set:
     return {k for k, v in (d or {}).items() if (v or 0) > 0}
 
 
-def user_provider_clusters(u: dict) -> set[str]:
+def build_provider_clusters(region_profile: lang.RegionProfile) -> dict[str, set[str]]:
+    """Merge the region's regional_providers into the global cluster set."""
+    clusters = {k: set(v) for k, v in GLOBAL_PROVIDER_CLUSTERS.items()}
+    if region_profile.regional_providers:
+        clusters["regional_api"] = set(region_profile.regional_providers)
+    return clusters
+
+
+def user_provider_clusters(u: dict, provider_clusters: dict[str, set[str]]) -> set[str]:
     """Which provider clusters has this user mentioned at least once?"""
     mentioned = nonzero(u.get("providers", {}))
     clusters = set()
-    for cluster_name, members in PROVIDER_CLUSTERS.items():
+    for cluster_name, members in provider_clusters.items():
         if mentioned & members:
             clusters.add(cluster_name)
     return clusters
@@ -138,10 +147,11 @@ def user_acquisition_buckets(u: dict) -> set[str]:
     return buckets
 
 
-def user_location(u: dict) -> str:
+def user_location(u: dict, region_profile: lang.RegionProfile) -> str:
     """Assign user to a timezone-proxy location based on modal posting hour (UTC).
 
-    Mirrors the logic in analyze.py's `tz_buckets` aggregation.
+    Mirrors the logic in analyze.py's `tz_buckets` aggregation, using the
+    same region profile's timezone_buckets so this generalizes to any region.
     """
     hod = u.get("hours_of_day", {}) or {}
     if not hod:
@@ -152,12 +162,13 @@ def user_location(u: dict) -> str:
         h = int(modal_h)
     except (TypeError, ValueError):
         return "unknown"
-    if 12 <= h <= 16:
-        return "mainland_evening"
-    if h in (0, 1, 2, 3, 4, 5, 6):
-        return "na_evening"
-    if 18 <= h <= 22:
-        return "eu_evening"
+    for label, (lo, hi) in region_profile.timezone_buckets.items():
+        if lo <= hi:
+            if lo <= h <= hi:
+                return label
+        else:
+            if h >= lo or h <= hi:
+                return label
     return "other"
 
 
@@ -204,6 +215,7 @@ def user_has_competitor(u: dict) -> str:
     """Has this user mentioned any competitor product?"""
     competitors = nonzero(u.get("competitors", {}))
     return "yes" if competitors else "no"
+
 
 
 # ----------------------------------------------------------------------------
@@ -313,25 +325,35 @@ def format_table_md(
 # ----------------------------------------------------------------------------
 
 
-def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], str]:
+def build_crosstabs(
+    users: list[dict], now: datetime, region_profile: lang.RegionProfile | None = None
+) -> tuple[dict[str, Any], str]:
     """Return (json_dict, markdown_string)."""
+    region_profile = region_profile or lang.get_region_profile("global")
+    provider_clusters = build_provider_clusters(region_profile)
+    location_fn = lambda u: user_location(u, region_profile)  # noqa: E731
 
-    # Restrict to Chinese-speaking cohort: zh_primary + bilingual
-    zh_users = [
-        u for u in users if u.get("language_primary") in ("zh_primary", "bilingual")
+    # Restrict to target-language cohort: target_primary + bilingual. Accepts
+    # both the current key names and the legacy zh_primary/en_primary labels
+    # for users.json files produced before the language-generalization pass.
+    target_cohort_labels = ("target_primary", "bilingual", "zh_primary")
+    cohort_users = [
+        u for u in users if u.get("language_primary") in target_cohort_labels
     ]
 
     md_sections = []
-    md_sections.append("# Cross-tabulations — Chinese-speaking cohort")
+    md_sections.append(f"# Cross-tabulations — {region_profile.name} cohort")
     md_sections.append("")
     md_sections.append(
-        f"**Cohort size:** {len(zh_users)} users (zh_primary + bilingual).  "
+        f"**Cohort size:** {len(cohort_users)} users (target-language primary + bilingual).  "
     )
+    md_sections.append(f"**Region profile:** {region_profile.name} (`{region_profile.code}`)  ")
     md_sections.append(f"**Reference time:** {now.isoformat()}  ")
     md_sections.append(f"**Total users in dataset:** {len(users)}")
     md_sections.append("")
     md_sections.append(
-        "All pivots below use the Chinese cohort only. Small-sample warnings flag rows with N < 10."
+        "All pivots below use the target-language cohort only. "
+        "Small-sample warnings flag rows with N < 10."
     )
     md_sections.append("")
     md_sections.append("---")
@@ -339,32 +361,35 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
 
     crosstabs: dict[str, Any] = {
         "metadata": {
-            "chinese_cohort_size": len(zh_users),
+            "cohort_size": len(cohort_users),
+            "region": region_profile.code,
             "total_users": len(users),
             "reference_time": now.isoformat(),
+            # Back-compat alias for the original Chinese-specific key name
+            "chinese_cohort_size": len(cohort_users),
         },
     }
 
     # --- 1. Provider cluster × Location -----------------------------------
-    t = pivot(zh_users, user_provider_clusters, user_location, multi_row=True)
+    t = pivot(cohort_users, lambda u: user_provider_clusters(u, provider_clusters), location_fn, multi_row=True)
     crosstabs["provider_cluster_x_location"] = t
     md_sections.append(
         format_table_md(
             "1. Provider cluster × Location proxy",
             t,
             interpretation=(
-                "If `chinese_api` is concentrated in `mainland_evening`, "
-                "mainland users rely on Chinese providers — "
+                "If `regional_api` is concentrated in this region's primary geography bucket, "
+                "local users rely on regional providers — "
                 "strengthens the case for investing in that provider's UX. "
-                "If `western_api` dominates `na_evening` / `eu_evening`, overseas Chinese diaspora "
-                "still works via Anthropic/OpenAI and doesn't need mainland-specific provider UX."
+                "If `western_api` dominates the other geography buckets, the diaspora/overseas "
+                "cohort still works via Anthropic/OpenAI and doesn't need regional-specific provider UX."
             ),
-            note="Multi-row: a user mentioning both DeepSeek and Claude counts in both provider-cluster rows.",
+            note="Multi-row: a user mentioning both a regional and a Western provider counts in both provider-cluster rows.",
         )
     )
 
     # --- 2. Messaging platform × Location ---------------------------------
-    t = pivot(zh_users, user_messaging_buckets, user_location, multi_row=True)
+    t = pivot(cohort_users, user_messaging_buckets, location_fn, multi_row=True)
     crosstabs["messaging_x_location"] = t
     md_sections.append(
         format_table_md(
@@ -372,16 +397,16 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             t,
             interpretation=(
                 "Which IM platform does each geography actually care about? "
-                "`feishu_lark` concentrated in `mainland_evening` → a Feishu-adapter "
-                "investment is mainland-driven. `wechat_family` dominating → pivot toward WeChat instead. "
-                "`dingtalk` non-trivial → enterprise-adjacent mainland users; consider a DingTalk adapter."
+                "`feishu_lark` concentrated in this region's primary geography bucket → a Feishu-adapter "
+                "investment is regionally-driven. `wechat_family` dominating → pivot toward WeChat instead. "
+                "`dingtalk` non-trivial → enterprise-adjacent local users; consider a DingTalk adapter."
             ),
             note="Multi-row: a user mentioning both Feishu and WeChat counts in both rows.",
         )
     )
 
     # --- 3. Feature depth × Retention -------------------------------------
-    t = pivot(zh_users, user_feature_depth, lambda u: user_retention(u, now))
+    t = pivot(cohort_users, user_feature_depth, lambda u: user_retention(u, now))
     crosstabs["feature_depth_x_retention"] = t
     md_sections.append(
         format_table_md(
@@ -397,7 +422,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
     )
 
     # --- 4. Install path × Friction ---------------------------------------
-    t = pivot(zh_users, user_install_buckets, user_friction_level, multi_row=True)
+    t = pivot(cohort_users, user_install_buckets, user_friction_level, multi_row=True)
     crosstabs["install_x_friction"] = t
     md_sections.append(
         format_table_md(
@@ -414,7 +439,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
     )
 
     # --- 5. Impersonator mentions × Friction ------------------------------
-    t = pivot(zh_users, user_has_impersonator, user_friction_level)
+    t = pivot(cohort_users, user_has_impersonator, user_friction_level)
     crosstabs["impersonator_x_friction"] = t
     md_sections.append(
         format_table_md(
@@ -430,7 +455,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
     )
 
     # --- 6. Competitor usage × Retention -----------------------------------
-    t = pivot(zh_users, user_has_competitor, lambda u: user_retention(u, now))
+    t = pivot(cohort_users, user_has_competitor, lambda u: user_retention(u, now))
     crosstabs["competitor_x_retention"] = t
     md_sections.append(
         format_table_md(
@@ -447,7 +472,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
 
     # --- 7. Acquisition channel × Retention -------------------------------
     t = pivot(
-        zh_users,
+        cohort_users,
         user_acquisition_buckets,
         lambda u: user_retention(u, now),
         multi_row=True,
@@ -458,7 +483,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             "7. Acquisition channel × Retention",
             t,
             interpretation=(
-                "Which acquisition sources produce sticky Chinese users? "
+                "Which acquisition sources produce sticky users in this cohort? "
                 "Higher `active_30d` share for `tech_community` vs `content` → "
                 "invest in GitHub / HN / HF model-card presence over long-form articles. "
                 "Higher `active_30d` for `word_of_mouth` → community referral is the strongest driver; "
@@ -507,6 +532,15 @@ def main() -> int:
         default=None,
         help="ISO timestamp to use as 'now' for retention calc (default: latest last_seen in data)",
     )
+    p.add_argument(
+        "--region",
+        type=str,
+        default="cn",
+        help="Region code controlling timezone-proxy buckets and regional-provider "
+             "clustering (see languages.py REGION_PROFILES: cn, jp, kr, ru, latam, mena, "
+             "global, ...). Unknown codes fall back to 'global'. Default: cn "
+             "(backward-compatible).",
+    )
     args = p.parse_args()
 
     if not args.users_json.exists():
@@ -515,6 +549,12 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+
+    region_profile = lang.get_region_profile(args.region)
+    if args.region not in lang.REGION_PROFILES:
+        print(f"[warn] unknown --region '{args.region}'; "
+              f"known codes: {', '.join(sorted(lang.REGION_PROFILES))}. "
+              f"Falling back to 'global'.", file=sys.stderr)
 
     users_data = json.loads(args.users_json.read_text(encoding="utf-8"))
     # users.json is dict {user_id: user_obj}; convert to list
@@ -540,7 +580,7 @@ def main() -> int:
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
 
-    crosstabs, md = build_crosstabs(users, now)
+    crosstabs, md = build_crosstabs(users, now, region_profile=region_profile)
 
     # Write JSON
     args.out.parent.mkdir(parents=True, exist_ok=True)

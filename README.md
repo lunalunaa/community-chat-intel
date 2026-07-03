@@ -2,12 +2,13 @@
 
 **A privacy-preserving toolkit for turning raw chat exports (Discord / Telegram / Feishu-Lark / any JSON export) into structured community-intelligence reports — combining classic NLP heuristics, local embeddings, structured LLM extraction, deterministic analytics, and multi-model synthesis into a single reproducible pipeline.**
 
-Built to answer a real question — *"how does our Chinese-speaking user community actually use our product?"* — without running an intrusive survey. The pipeline extracts the same research signals a poll would have produced (usage patterns, install friction, provider/platform preferences, brand confusion, feature requests) passively from existing chat history, with hashed user IDs and no raw-quote leakage by default.
+Built to answer a real question — *"how does our non-English-speaking user community actually use our product?"* — without running an intrusive survey. The pipeline extracts the same research signals a poll would have produced (usage patterns, install friction, provider/platform preferences, brand confusion, feature requests) passively from existing chat history, with hashed user IDs and no raw-quote leakage by default.
 
-This repo is the **generalized, open-sourced version** of a project originally built for a real ~3,100-member Chinese-language community chat. All organization-specific branding, strategic recommendations, and live data have been stripped or parameterized; what's left is a reusable framework plus one fully-worked example (with real, illustrative numbers) documented in [`docs/PIPELINE.md`](docs/PIPELINE.md).
+**Not limited to Chinese.** Pick any target language/region with `--target-language` / `--region` (see [`languages.py`](languages.py)) — Japanese/Japan, Korean/Korea, Russian/Russia-CIS, Spanish/LatAm, Arabic/MENA, or add your own profile. `--target-language none` disables the language-cohort split entirely for already-monolingual exports. The pipeline was originally built and tested end-to-end against a real ~3,100-member Chinese-language community chat — kept as the default and as one fully-worked example (with real, illustrative numbers) in [`docs/PIPELINE.md`](docs/PIPELINE.md) — but every language/region-specific behavior (message-language detection, question-marker patterns, shadow-community platforms, timezone-proxy buckets, regional provider clustering) is now driven by a swappable profile, not hardcoded.
 
 ## Why this exists / what it demonstrates
 
+- **Language/region-agnostic core, one worked example** — `languages.py` centralizes everything that differs by target market: script-ratio or stopword-ratio language detection (CJK-family scripts, Cyrillic, Arabic, Latin-script languages via a stopword heuristic), per-language question-marker regexes, per-region shadow-community platform lists, per-region timezone-proxy buckets, and per-region "which providers count as regional" clustering. Add a new market by adding one `LanguageProfile` + one `RegionProfile` entry — no pipeline code changes required.
 - **Multi-stream analysis architecture** — four independent analysis techniques (broad LLM topic tagging, local-embedding semantic retrieval + FAISS, structured LLM fact extraction with tolerant JSON retry, and pure-Python deterministic analytics) run in parallel over the same corpus and get reconciled by a final synthesis pass. Each stream compensates for another's blind spots — see [`docs/PIPELINE.md`](docs/PIPELINE.md) for the full rationale.
 - **Ground-truth anchoring** — chat platforms that don't log "member left" events (Feishu/Lark, and effectively most groups without admin logs) make join-event counts systematically overstate current membership. The pipeline pins retention/engagement denominators to a manually-verified live membership count instead of trusting derived numbers.
 - **Zero-dependency LLM orchestration** — every LLM call shells out to a locally-configured LLM CLI (`hermes chat -q ...` by default), so there are no API keys hardcoded anywhere in this codebase and switching providers is a one-flag change (`LLM_PROVIDER` / `LLM_MODEL` env vars). Swap the `cmd` list in each stream script if you use a different CLI.
@@ -63,19 +64,51 @@ pip install -r requirements.txt
 #    Result: e.g. ~/Downloads/discord_export.json
 
 # 2. Core keyword-analysis pipeline (seconds for small exports)
-python3 analyze.py --input ~/Downloads/discord_export.json --platform discord --out ./out -v
+#    Defaults to --target-language zh --region cn for backward compatibility;
+#    pick your own market, e.g. Japanese/Japan:
+python3 analyze.py --input ~/Downloads/discord_export.json --platform discord \
+    --target-language ja --region jp --out ./out -v
 
 # 3. (Optional) LLM topic tagging — shells out to your configured `hermes` CLI
 python3 topics.py --input-chat ~/Downloads/discord_export.json --platform discord \
-    --out ./out/topics.json --limit 200
+    --target-language ja --out ./out/topics.json --limit 200
 
 # 4. (Optional) Cross-tabulations
-python3 crosstabs.py --users-json ./out/users.json --out ./out/crosstabs.json
+python3 crosstabs.py --users-json ./out/users.json --region jp --out ./out/crosstabs.json
 
 # 5. Review ./out/report.md, ./out/stats.json, ./out/crosstabs.md
 ```
 
 For the full 4-stream deep-analysis pipeline (semantic retrieval, structured fact extraction, deterministic analytics, cross-stream synthesis, final report with recommendations), see [`docs/PIPELINE.md`](docs/PIPELINE.md) — it documents exact commands, environment variables, and a real cost/runtime breakdown.
+
+## Language / region support
+
+`--target-language` and `--region` are accepted by `analyze.py`, `topics.py`, and `crosstabs.py`. See [`languages.py`](languages.py) for the full registry and to add your own:
+
+| `--target-language` | Language | Detection method |
+|---|---|---|
+| `zh` (default) | Chinese | CJK-ideograph script ratio |
+| `ja` | Japanese | Hiragana/Katakana + shared CJK ideograph script ratio |
+| `ko` | Korean | Hangul script ratio |
+| `ru` | Russian | Cyrillic script ratio |
+| `ar` | Arabic | Arabic script ratio |
+| `he` | Hebrew | Hebrew script ratio |
+| `th` | Thai | Thai script ratio |
+| `vi` | Vietnamese | Vietnamese-diacritic script ratio |
+| `es`, `fr`, `de`, `pt`, `id` | Spanish, French, German, Portuguese, Indonesian | Stopword-frequency ratio (lower precision than script-ratio languages — spot-check a sample) |
+| `none` | — | Disables language classification; every message counts as target (for already-monolingual exports) |
+
+| `--region` | Region | Shadow-community platforms | Timezone-proxy buckets |
+|---|---|---|---|
+| `cn` (default) | Greater China | Zhihu, WeChat OA/groups, QQ groups, Bilibili, Xiaohongshu, Juejin, CSDN, ... | mainland/NA/EU evening |
+| `jp` | Japan | note.com, Qiita, Zenn, X, 5ch, ... | JST/NA/EU evening |
+| `kr` | Korea | Naver Blog, Velog, Disquiet, OKKY, KakaoTalk open chat, ... | KST/NA/EU evening |
+| `ru` | Russia/CIS | VK, Habr, Telegram channels, ... | MSK/EU/NA evening |
+| `latam` | Latin America | Reddit, YouTube, Discord, WhatsApp groups, ... | LatAm/NA/EU evening |
+| `mena` | Middle East/North Africa | Reddit, Telegram channels, YouTube, ... | Gulf/EU/NA evening |
+| `global` | Global/English-default | Reddit, Hacker News, LinkedIn, Product Hunt, ... | NA/EU/APAC evening |
+
+Adding a new language or region is a matter of adding one `LanguageProfile` / `RegionProfile` entry to `languages.py` — no changes needed elsewhere in the pipeline.
 
 ## Adapting for your own community
 
@@ -97,7 +130,8 @@ All stream scripts (`stream_b_embed_retrieve.py`, `stream_c_fact_extract.py`, `s
 
 | File | Purpose |
 |---|---|
-| `analyze.py` | Core pipeline (CLI entry point) — adapters, keyword extraction, stats, redaction |
+| `analyze.py` | Core pipeline (CLI entry point) — adapters, language classification, keyword extraction, stats, redaction |
+| `languages.py` | Language/region profile registry — script-ratio & stopword-ratio language detection, per-language question markers, per-region shadow-community platforms & timezone buckets |
 | `topics.py` | Stream A: LLM topic-tagging pass (12 fixed categories) |
 | `crosstabs.py` | Cross-tabulation helper (provider × location, feature × retention, etc.) |
 | `keywords.py` | Keyword dictionaries — edit this to tune detection for your own product/ecosystem |
@@ -129,7 +163,7 @@ All stream scripts (`stream_b_embed_retrieve.py`, `stream_c_fact_extract.py`, `s
 
 ## Known limitations
 
-Chinese-language classification is heuristic (CJK-ratio based); question-detection is regex-based; reply-chain structure is platform-dependent; LLM extraction has a small (~1-2%) cross-field bleed rate; short export windows make retention metrics unreliable. Full discussion in `docs/PIPELINE.md` §4 (Limitations & Caveats template inside `build_final_report.py`).
+Language classification is heuristic — script-ratio based for languages with a dedicated Unicode block (Chinese, Japanese, Korean, Russian, Arabic, Hebrew, Thai, Vietnamese), stopword-frequency based for Latin-script languages (Spanish, French, German, Portuguese, Indonesian) with correspondingly lower precision; question-detection is regex-based per language (English patterns always included as a fallback); reply-chain structure is platform-dependent; LLM extraction has a small (~1-2%) cross-field bleed rate; short export windows make retention metrics unreliable; regional-provider clustering and shadow-community platform lists in `languages.py` are illustrative starting points for each region, not exhaustive — extend them for your own market. Full discussion in `docs/PIPELINE.md` §4 (Limitations & Caveats template inside `build_final_report.py`).
 
 ## License
 

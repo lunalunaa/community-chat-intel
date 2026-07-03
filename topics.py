@@ -1,10 +1,15 @@
 """LLM topic-tagging pass for the community chat-history analysis pipeline.
 
-Tags every Chinese / mixed-language message with one of a fixed topic set by
-shelling out to a locally-configured LLM CLI tool (any CLI that accepts a
-prompt and prints the response to stdout). Configure the command via the
-LLM_CLI environment variable (space-separated, default: "hermes chat -q") —
-see run_llm_cli() below.
+Tags every target-language / mixed-language message with one of a fixed
+topic set by shelling out to a locally-configured LLM CLI tool (any CLI that
+accepts a prompt and prints the response to stdout). Configure the command
+via the LLM_CLI environment variable (space-separated, default: "hermes chat
+-q") — see run_llm_cli() below.
+
+Works for any target language (see `languages.py` for the supported list) —
+pass `--target-language ja` for Japanese, `--target-language none` to tag
+every message regardless of language classification, etc. Defaults to `zh`
+for backward compatibility.
 
 No direct API calls, no external API keys needed from this script itself —
 your provider's key lives wherever your chosen CLI expects it, and the CLI
@@ -22,6 +27,7 @@ USAGE:
       --users-json ./out/users.json \\
       --input-chat ./discord_export.json \\
       --platform discord \\
+      --target-language ja \\
       --out ./out/topics.json \\
       [--batch-size 25] \\
       [--concurrency 2] \\
@@ -51,6 +57,7 @@ from pathlib import Path
 # Reuse the pipeline's adapters + language classifier
 sys.path.insert(0, str(Path(__file__).parent))
 import analyze  # noqa: E402
+import languages as lang  # noqa: E402
 
 
 # ----------------------------------------------------------------------------
@@ -74,8 +81,23 @@ TOPIC_CATEGORIES = [
 # ----------------------------------------------------------------------------
 # Prompt construction
 # ----------------------------------------------------------------------------
-SYSTEM_PROMPT_HEADER = """\
-You are a Chinese/English-bilingual message classifier for a product's community chat.
+def build_system_prompt_header(language_name: str | None) -> str:
+    """Build the classifier system prompt for the given target-language name.
+
+    `language_name=None` means language classification was disabled upstream
+    (every message is treated as in-scope) — the prompt is phrased generically
+    in that case rather than naming a specific bilingual pairing.
+    """
+    bilingual_desc = (
+        f"a {language_name}/English-bilingual message classifier"
+        if language_name else
+        "a multilingual message classifier"
+    )
+    brand_example_lang = (
+        f"other {language_name}-language" if language_name else "other local-language"
+    )
+    return f"""\
+You are {bilingual_desc} for a product's community chat.
 
 For each message in the input batch, assign exactly ONE primary topic from this list:
   - install_help       : user is asking HOW to install / deploy the product or a dependency
@@ -85,7 +107,7 @@ For each message in the input batch, assign exactly ONE primary topic from this 
   - feature_usage      : using product-specific features (skills / memory / cron / subagents / MCP / browser / vision / etc.)
   - model_discussion   : comparing models, benchmarks, opinions about which LLM is best
   - community_meta     : announcements, links to external content, meetups, events
-  - brand_identity     : asking whether a site / WeChat group / other Chinese-language resource is official
+  - brand_identity     : asking whether a site / group chat / {brand_example_lang} resource is official
   - bug_report         : reporting a reproducible technical issue
   - feature_request    : requesting a new feature or capability
   - success_story      : showing off a workflow, demo, or success
@@ -93,24 +115,24 @@ For each message in the input batch, assign exactly ONE primary topic from this 
 
 OUTPUT FORMAT (STRICT):
 Return a JSON array. One element per input message. Each element has exactly:
-  {"id": "<message id as given>", "topic": "<one of the categories above>"}
+  {{"id": "<message id as given>", "topic": "<one of the categories above>"}}
 
 Do not include any other text, markdown, or explanation. Only the JSON array.
 
 Examples:
-  Input:  [{"id": "m1", "text": "怎么配置这个 provider? 报错了 unauthorized"}]
-  Output: [{"id": "m1", "topic": "provider_config"}]
+  Input:  [{{"id": "m1", "text": "怎么配置这个 provider? 报错了 unauthorized"}}]
+  Output: [{{"id": "m1", "topic": "provider_config"}}]
 
-  Input:  [{"id": "m2", "text": "有人在 example-product.org.cn 上看过介绍吗？是官方的吗"}]
-  Output: [{"id": "m2", "topic": "brand_identity"}]
+  Input:  [{{"id": "m2", "text": "有人在 example-product.org.cn 上看过介绍吗？是官方的吗"}}]
+  Output: [{{"id": "m2", "topic": "brand_identity"}}]
 """
 
 
-def build_batch_prompt(batch: list[dict[str, str]]) -> str:
+def build_batch_prompt(batch: list[dict[str, str]], system_prompt_header: str) -> str:
     """Pair the system header with a batch of messages to classify."""
     payload = json.dumps(batch, ensure_ascii=False)
     return (
-        f"{SYSTEM_PROMPT_HEADER}\n"
+        f"{system_prompt_header}\n"
         f"Classify the following {len(batch)} message(s). "
         f"Return exactly {len(batch)} elements in the output array, in the same order.\n\n"
         f"Input:\n{payload}\n\n"
@@ -236,16 +258,20 @@ class TopicCache:
 # Message loading (reuses analyze.py adapters)
 # ----------------------------------------------------------------------------
 
-def load_chinese_messages(chat_path: Path, platform: str, salt: str) -> list[analyze.Message]:
-    """Load messages, filter to zh + mixed."""
+def load_target_language_messages(
+    chat_path: Path, platform: str, salt: str, language_profile: lang.LanguageProfile | None
+) -> list[analyze.Message]:
+    """Load messages, filter to target + mixed (or all, if language_profile is None)."""
     adapter = analyze.ADAPTERS[platform]
     all_msgs = list(adapter(chat_path, salt))
-    zh_msgs = []
+    if language_profile is None:
+        return all_msgs
+    filtered = []
     for m in all_msgs:
-        lang = analyze.classify_language(m.content)
-        if lang in ("zh", "mixed"):
-            zh_msgs.append(m)
-    return zh_msgs
+        classification = analyze.classify_language(m.content, language_profile)
+        if classification in ("target", "mixed"):
+            filtered.append(m)
+    return filtered
 
 
 # ----------------------------------------------------------------------------
@@ -258,6 +284,7 @@ def process_batch(
     model: str | None,
     cache: TopicCache,
     dry_run: bool,
+    system_prompt_header: str,
 ) -> dict[str, str]:
     """Tag a single batch. Returns {message_id: topic}."""
     # Cache lookup first — filter out already-tagged messages
@@ -284,7 +311,7 @@ def process_batch(
         {"id": m.message_id, "text": m.content[:800]}
         for m in to_tag
     ]
-    prompt = build_batch_prompt(batch_payload)
+    prompt = build_batch_prompt(batch_payload, system_prompt_header)
     expected_ids = [m.message_id for m in to_tag]
 
     # Try once, retry once with smaller batch on parse failure
@@ -308,7 +335,9 @@ def process_batch(
         print(f"[parse] batch parse failed; retrying {len(to_tag)} individually", file=sys.stderr)
         parsed = {}
         for m in to_tag:
-            single_prompt = build_batch_prompt([{"id": m.message_id, "text": m.content[:800]}])
+            single_prompt = build_batch_prompt(
+                [{"id": m.message_id, "text": m.content[:800]}], system_prompt_header
+            )
             try:
                 single_raw = call_llm_cli(single_prompt, provider=provider, model=model)
                 single_parsed = parse_llm_response(single_raw, [m.message_id])
@@ -343,17 +372,23 @@ def run(
     dry_run: bool = False,
     limit: int | None = None,
     stats_path: Path | None = None,
+    language_profile: lang.LanguageProfile | None = None,
 ) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path = out_path.parent / ".topics_cache.json"
     cache = TopicCache(cache_path)
 
+    system_prompt_header = build_system_prompt_header(
+        language_profile.name if language_profile else None
+    )
+
     salt = analyze.ensure_salt(salt_path)
-    messages = load_chinese_messages(chat_path, platform, salt)
+    messages = load_target_language_messages(chat_path, platform, salt, language_profile)
     if limit:
         messages = messages[:limit]
 
-    print(f"[topics] {len(messages)} Chinese/mixed messages to tag "
+    lang_desc = language_profile.name if language_profile else "all-language"
+    print(f"[topics] {len(messages)} {lang_desc}/mixed messages to tag "
           f"(cache has {len(cache.data)} entries)", file=sys.stderr)
 
     # Build batches
@@ -365,7 +400,7 @@ def run(
 
     if concurrency <= 1:
         for i, batch in enumerate(batches):
-            batch_results = process_batch(batch, provider, model, cache, dry_run)
+            batch_results = process_batch(batch, provider, model, cache, dry_run, system_prompt_header)
             all_results.update(batch_results)
             cache.save()  # persist after each batch so Ctrl-C is safe
             elapsed = time.time() - start
@@ -374,7 +409,7 @@ def run(
                   file=sys.stderr)
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as ex:
-            futures = {ex.submit(process_batch, b, provider, model, cache, dry_run): i
+            futures = {ex.submit(process_batch, b, provider, model, cache, dry_run, system_prompt_header): i
                        for i, b in enumerate(batches)}
             for f in as_completed(futures):
                 batch_results = f.result()
@@ -436,6 +471,10 @@ def main() -> int:
     p.add_argument("--input-chat", required=True, type=Path,
                    help="Chat export JSON (same file used with analyze.py)")
     p.add_argument("--platform", required=True, choices=list(analyze.ADAPTERS.keys()))
+    p.add_argument("--target-language", type=str, default="zh",
+                   help="Language code to filter/tag messages for (see languages.py "
+                        "LANGUAGE_PROFILES; default: zh). Pass 'none' to tag every message "
+                        "regardless of language classification.")
     p.add_argument("--out", type=Path, default=Path("./out/topics.json"),
                    help="Output path for topics.json (default: ./out/topics.json)")
     p.add_argument("--salt-file", type=Path,
@@ -443,18 +482,24 @@ def main() -> int:
     p.add_argument("--stats-path", type=Path, default=None,
                    help="Path to stats.json to merge .topics into (default: <out>/stats.json)")
     p.add_argument("--batch-size", type=int, default=25,
-                   help="Messages per Hermes call (default: 25)")
+                   help="Messages per LLM CLI call (default: 25)")
     p.add_argument("--concurrency", type=int, default=1,
-                   help="Parallel Hermes subprocesses (default: 1 — sequential)")
+                   help="Parallel LLM CLI subprocesses (default: 1 — sequential)")
     p.add_argument("--provider", type=str, default=None,
-                   help="Hermes --provider override (default: whatever user has configured)")
+                   help="LLM CLI --provider override (default: whatever you have configured)")
     p.add_argument("--model", type=str, default=None,
-                   help="Hermes --model override")
+                   help="LLM CLI --model override")
     p.add_argument("--dry-run", action="store_true",
-                   help="Don't call Hermes; tag everything as general_discussion (for pipeline shape testing)")
+                   help="Don't call the LLM CLI; tag everything as general_discussion (for pipeline shape testing)")
     p.add_argument("--limit", type=int, default=None,
-                   help="Only process the first N Chinese messages (for testing / cost-capping)")
+                   help="Only process the first N target-language messages (for testing / cost-capping)")
     args = p.parse_args()
+
+    language_profile = lang.get_language_profile(args.target_language)
+    if args.target_language not in (None, "none", "off") and language_profile is None:
+        print(f"[warn] unknown --target-language '{args.target_language}'; "
+              f"known codes: {', '.join(sorted(lang.LANGUAGE_PROFILES))}. "
+              f"Falling back to no language filtering.", file=sys.stderr)
 
     # Check the LLM CLI is available unless dry-run
     if not args.dry_run:
@@ -488,6 +533,7 @@ def main() -> int:
         dry_run=args.dry_run,
         limit=args.limit,
         stats_path=args.stats_path,
+        language_profile=language_profile,
     )
     return 0
 
