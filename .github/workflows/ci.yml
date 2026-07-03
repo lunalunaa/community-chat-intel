@@ -48,9 +48,9 @@ jobs:
           uv run chatintel-topics --help | head -1
           uv run chatintel-crosstabs --help | head -1
       - name: Smoke-test pipeline on synthetic data
+        working-directory: ${{ github.workspace }}
         run: |
           mkdir -p /tmp/ci-smoke
-          cd /tmp/ci-smoke
           python3 -c "
           import json
           export = {
@@ -67,17 +67,17 @@ jobs:
                    'reactions': [], 'attachments': []},
               ],
           }
-          json.dump(export, open('export.json', 'w'), ensure_ascii=False)
+          json.dump(export, open('/tmp/ci-smoke/export.json', 'w'), ensure_ascii=False)
           "
-          uv run chatintel-analyze --input export.json --platform discord --out ./out -v
-          uv run chatintel-crosstabs --users-json ./out/users.json --out ./out/crosstabs.json
-          uv run chatintel-topics --input-chat export.json --platform discord --dry-run \
-              --out ./out/topics.json --stats-path ./out/stats.json
-          test -f ./out/report.md
-          test -f ./out/stats.json
-          test -f ./out/users.json
-          test -f ./out/crosstabs.json
-          test -f ./out/topics.json
+          uv run chatintel-analyze --input /tmp/ci-smoke/export.json --platform discord --out /tmp/ci-smoke/out -v
+          uv run chatintel-crosstabs --users-json /tmp/ci-smoke/out/users.json --out /tmp/ci-smoke/out/crosstabs.json
+          uv run chatintel-topics --input-chat /tmp/ci-smoke/export.json --platform discord --dry-run \
+              --out /tmp/ci-smoke/out/topics.json --stats-path /tmp/ci-smoke/out/stats.json
+          test -f /tmp/ci-smoke/out/report.md
+          test -f /tmp/ci-smoke/out/stats.json
+          test -f /tmp/ci-smoke/out/users.json
+          test -f /tmp/ci-smoke/out/crosstabs.json
+          test -f /tmp/ci-smoke/out/topics.json
           echo "=== smoke test passed ==="
       - name: Build sdist + wheel
         run: uv build
