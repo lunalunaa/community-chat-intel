@@ -2,6 +2,7 @@
 out/
 out_full/
 dailies/
+dashboard.html
 *.db
 *.sqlite3
 
