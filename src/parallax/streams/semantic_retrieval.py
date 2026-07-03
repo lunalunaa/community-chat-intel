@@ -140,73 +140,17 @@ index = faiss.IndexFlatIP(
 )  # inner product == cosine on normalized vectors
 index.add(embs.astype("float32"))
 
-# ===== Retrieval queries =====
-# Structured queries, keyed by target language. Each language's query set is
-# an EXAMPLE for a generic AI-agent product — replace the product name /
-# feature names / competitor names with your own. The query *shape*
-# (feature-adapter demand, gateway-vs-direct-API usage, brand confusion,
-# pricing complaints, network friction, competitor comparison) is the
-# reusable part; write your own query text in whichever language your
-# community actually uses (set TARGET_LANGUAGE / QUERIES_BY_LANGUAGE below).
-QUERIES_BY_LANGUAGE: dict[str, dict[str, str]] = {
-    "zh": {
-        # Messaging-adapter demand
-        "feishu_adapter_demand": "想要把这个产品接入飞书机器人，飞书 webhook，飞书对接",
-        "feishu_actively_building": "我正在开发飞书集成，我写了一个飞书 adapter",
-        "wechat_adapter_demand": "能不能接入微信，微信机器人，企业微信",
-        "dingtalk_adapter_demand": "钉钉机器人，钉钉对接",
-        # Gateway / hosted vs direct API
-        "hosted_service_usage": "我在用官方托管服务，额度，门户",
-        "direct_vendor_api_usage": "我直接用 kimi API，minimax API key，直接调 deepseek",
-        "openrouter_usage": "openrouter 更便宜，通过 openrouter 用",
-        "agent_key_sharing": "大家分享一下 sk-key，谁有 API key 能借用，合租",
-        # Topic texture
-        "install_friction": "安装不上，报错，无法运行，docker 启动失败",
-        "brand_identity_confusion": "这是官方吗，是真的假的，哪个是官方网站",
-        "pricing_complaints": "太贵了，免费额度用完，信用卡支付不了，限额",
-        "vpn_friction": "被墙了，没法访问，需要翻墙，国内用不了",
-        "success_stories": "我用这个做了，搭建了个智能体，跑起来了",
-        "feature_requests": "希望能加上，我想要一个功能，建议增加",
-        "core_feature_usage": "skill memory cron 怎么用，如何创建 skill",
-        # Competitor sentiment
-        "comparison_with_competitors": "对比竞品A, 比竞品B好，和竞品C区别",
-        "comparison_with_alt_tools": "比claude code好，比codex强，比cursor",
-        # Community hubs
-        "mentions_of_external_communities": "我的微信公众号，关注我的知乎，B站视频教程",
-    },
-    "en": {
-        # Messaging-adapter demand
-        "slack_adapter_demand": "wants to connect this product to Slack, Slack webhook, Slack integration",
-        "slack_actively_building": "I'm building a Slack integration, I wrote a Slack adapter",
-        "discord_adapter_demand": "can you add Discord support, Discord bot integration",
-        "teams_adapter_demand": "Microsoft Teams bot, Teams integration",
-        # Gateway / hosted vs direct API
-        "hosted_service_usage": "using the official hosted service, credits, portal",
-        "direct_vendor_api_usage": "using the OpenAI API directly, Anthropic API key, calling Claude directly",
-        "openrouter_usage": "OpenRouter is cheaper, going through OpenRouter",
-        "agent_key_sharing": "sharing an sk- key, does anyone have a spare API key, splitting a subscription",
-        # Topic texture
-        "install_friction": "can't install, error, won't run, docker fails to start",
-        "brand_identity_confusion": "is this official, is this a scam, which is the real website",
-        "pricing_complaints": "too expensive, ran out of free credits, card declined, rate limited",
-        "network_friction": "blocked in my country, can't access, need a VPN, region-locked",
-        "success_stories": "I built this with it, set up an agent, got it running",
-        "feature_requests": "wish it had, I want a feature where, would be great if",
-        "core_feature_usage": "how do I use skills memory cron, how to create a skill",
-        # Competitor sentiment
-        "comparison_with_competitors": "compared to Competitor A, better than Competitor B, vs Competitor C",
-        "comparison_with_alt_tools": "better than Claude Code, stronger than Codex, vs Cursor",
-        # Community hubs
-        "mentions_of_external_communities": "my newsletter, follow me on Reddit, YouTube tutorial",
-    },
-}
+# ===== Retrieval queries (loaded from config) =====
+from parallax.core.config import load_queries
 
-QUERIES = QUERIES_BY_LANGUAGE.get(TARGET_LANGUAGE, QUERIES_BY_LANGUAGE["en"])
+QUERIES_BY_LANGUAGE = load_queries()
+
+QUERIES = QUERIES_BY_LANGUAGE.get(TARGET_LANGUAGE, QUERIES_BY_LANGUAGE.get("en", {}))
 if TARGET_LANGUAGE not in QUERIES_BY_LANGUAGE:
     print(
         f"[stream_b] no QUERIES set for TARGET_LANGUAGE={TARGET_LANGUAGE!r}; "
         f"falling back to the 'en' example set. Add your own entry to "
-        f"QUERIES_BY_LANGUAGE for a language-native query set.",
+        f"queries.yaml for a language-native query set.",
         flush=True,
     )
 

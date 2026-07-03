@@ -39,20 +39,11 @@ brand_out.parent.mkdir(exist_ok=True)
 
 # 1. All brand_confusion incidents
 # 2. Scan ALL messages for impersonator/clone names + slang variants
-#    EXAMPLE patterns only — replace with your own product's brand/competitor map.
-BRAND_PATTERNS = {
-    "product_official": r"example[-\s]?product|example-org",
-    "shadow_docs_cluster": r"shadow-docs\.example|unofficial-docs\.example",
-    "clone_variant_a": r"exampleclone|example[\s-]?clone",
-    "clone_variant_b": r"nanoexample|nano[\s-]?example",
-    "cn_shadow_domain": r"example-product\.(cn|org\.cn)|exampleproduct(ai)?",
-    "colloquial_slang": r"example昵称",
-    "competitor_a_slang": r"竞品甲|competitor[\s-]?a",
-    "competitor_a_official": r"competitor a product",
-    "competitor_b": r"competitor[\s-]?b",
-    "competitor_c": r"competitor[\s-]?c",
-    "proxy_reseller_domains": r"example-proxy\.icu|example-reseller\.com",
-}
+#    Patterns loaded from config/brand_patterns.yaml — edit there to match
+#    your own product's brand/competitor variants.
+from parallax.core.config import load_brand_patterns
+
+BRAND_PATTERNS = load_brand_patterns()
 
 counts = Counter()
 samples = defaultdict(list)

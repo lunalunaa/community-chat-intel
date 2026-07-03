@@ -1,0 +1,96 @@
+# Fact extraction schema for Stream C
+#
+# Defines the JSON schema the LLM is asked to fill per message chunk.
+# Each category has:
+#   - field: the JSON key in the output
+#   - description: what this category captures (shown to the LLM)
+#   - fields: the sub-fields of each item in the array
+#
+# Edit this to match what you want to extract from YOUR community's messages.
+# Add/remove categories as needed — the aggregation code adapts automatically.
+
+prompt_intro: >
+  You are analyzing a chunk of chat messages from a product's community chat.
+  Extract structured facts. Output a single valid JSON object matching this
+  schema (omit arrays that have no instances):
+
+prompt_rules:
+  - "Only extract facts actually supported by the messages. No speculation."
+  - "If a chunk is mostly off-topic chatter, return mostly empty arrays."
+  - "Use actual user names from messages when present (anonymize only if clearly harmful)."
+  - "Keep all field values concise (<50 chars where possible)."
+  - "Output ONLY the JSON object, no prose before or after."
+
+categories:
+  - field: install_problems
+    description: Installation or setup issues users encounter
+    fields:
+      user_ref: "a short tag like 'user_A' or actual @name"
+      problem: "what broke"
+      os_or_context: "optional"
+      resolved: "true/false/null"
+
+  - field: provider_usage
+    description: Which LLM/API providers or gateways users mention
+    fields:
+      user_ref: "..."
+      provider_or_gateway: "hosted_service | openrouter | direct_kimi | direct_minimax | direct_glm | direct_volcengine | direct_deepseek | direct_qwen | proxy_reseller | self_hosted | anthropic | openai | other"
+      sentiment: "positive | negative | neutral"
+      quoted_context: "short"
+
+  - field: messaging_intent
+    description: Desire to integrate with messaging platforms
+    fields:
+      user_ref: "..."
+      platform: "feishu | wechat | dingtalk | qq | slack | discord | telegram | lark_intl | other"
+      intent: "exploring | wants_adapter | actively_building | using_via_existing_adapter"
+      context: "short"
+
+  - field: brand_confusion
+    description: Users unsure what's official/real
+    fields:
+      user_ref: "..."
+      question: "what they asked"
+      resolution: "answered | unanswered | conflicting"
+
+  - field: api_key_sharing_evidence
+    description: Evidence of API key sharing, reselling, or group purchasing
+    fields:
+      user_ref: "..."
+      type: "offering | seeking | reselling | group_purchase"
+      details: "short"
+
+  - field: pricing_complaints
+    description: Complaints about cost, pricing, or token consumption
+    fields:
+      user_ref: "..."
+      service: "what"
+      issue: "short"
+
+  - field: feature_requests
+    description: Requests for new features or improvements
+    fields:
+      user_ref: "..."
+      feature: "what they want"
+      use_case: "short"
+
+  - field: success_stories
+    description: Users reporting successful builds or positive outcomes
+    fields:
+      user_ref: "..."
+      what_built: "short"
+      tools_used: '["skills", "memory", "cron", "mcp", ...]'
+
+  - field: vpn_network_friction
+    description: Network access issues, regional blocks, connectivity problems
+    fields:
+      user_ref: "..."
+      issue: "short"
+      workaround: "optional"
+
+  - field: competitor_mentions
+    description: Mentions of competitor products
+    fields:
+      user_ref: "..."
+      competitor: "competitor_a | competitor_b | competitor_c | other"
+      stance: "favoring_product | favoring_competitor | neutral_comparison"

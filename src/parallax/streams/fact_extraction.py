@@ -99,36 +99,16 @@ print(f"[stream_c] {len(messages):,} messages loaded", flush=True)
 chunks = [messages[i : i + CHUNK_SIZE] for i in range(0, len(messages), CHUNK_SIZE)]
 print(f"[stream_c] {len(chunks)} chunks of ≤{CHUNK_SIZE} messages", flush=True)
 
-# ===== Extraction prompt =====
-EXTRACTION_PROMPT = (
-    f"You are analyzing a chunk of chat messages from a product's community chat "
-    f"({TARGET_LANGUAGE_NAME}-language, on a chat platform). Extract structured "
-    "facts. Output a single valid JSON object matching this schema (omit arrays "
-    "that have no instances):\n"
-    + """
-{
-  "install_problems": [{"user_ref": "a short tag like 'user_A' or actual @name", "problem": "what broke", "os_or_context": "optional", "resolved": true/false/null}],
-  "provider_usage": [{"user_ref": "...", "provider_or_gateway": "hosted_service | openrouter | direct_kimi | direct_minimax | direct_glm | direct_volcengine | direct_deepseek | direct_qwen | proxy_reseller | self_hosted | anthropic | openai | other", "sentiment": "positive | negative | neutral", "quoted_context": "short"}],
-  "messaging_intent": [{"user_ref": "...", "platform": "feishu | wechat | dingtalk | qq | slack | discord | telegram | lark_intl | other", "intent": "exploring | wants_adapter | actively_building | using_via_existing_adapter", "context": "short"}],
-  "brand_confusion": [{"user_ref": "...", "question": "what they asked", "resolution": "answered | unanswered | conflicting"}],
-  "api_key_sharing_evidence": [{"user_ref": "...", "type": "offering | seeking | reselling | group_purchase", "details": "short"}],
-  "pricing_complaints": [{"user_ref": "...", "service": "what", "issue": "short"}],
-  "feature_requests": [{"user_ref": "...", "feature": "what they want", "use_case": "short"}],
-  "success_stories": [{"user_ref": "...", "what_built": "short", "tools_used": ["skills", "memory", "cron", "mcp", ...]}],
-  "vpn_network_friction": [{"user_ref": "...", "issue": "short", "workaround": "optional"}],
-  "competitor_mentions": [{"user_ref": "...", "competitor": "competitor_a | competitor_b | competitor_c | other", "stance": "favoring_product | favoring_competitor | neutral_comparison"}]
-}
-
-Rules:
-- Only extract facts actually supported by the messages. No speculation.
-- If a chunk is mostly off-topic chatter, return mostly empty arrays.
-- Use actual user names from messages when present (anonymize only if clearly harmful).
-- Keep all field values concise (<50 chars where possible).
-- Output ONLY the JSON object, no prose before or after.
-
-MESSAGES:
-"""
+# ===== Extraction prompt (loaded from config) =====
+from parallax.core.config import (
+    build_extraction_prompt,
+    get_extraction_categories,
+    load_fact_schema,
 )
+
+_fact_schema = load_fact_schema()
+EXTRACTION_PROMPT = build_extraction_prompt(_fact_schema, TARGET_LANGUAGE_NAME)
+CATEGORIES = get_extraction_categories(_fact_schema)
 
 
 def format_chunk(chunk):
@@ -270,18 +250,7 @@ with (
 # ===== Aggregate =====
 print(f"[stream_c] aggregating facts across {len(all_facts)} chunks", flush=True)
 
-CATEGORIES = [
-    "install_problems",
-    "provider_usage",
-    "messaging_intent",
-    "brand_confusion",
-    "api_key_sharing_evidence",
-    "pricing_complaints",
-    "feature_requests",
-    "success_stories",
-    "vpn_network_friction",
-    "competitor_mentions",
-]
+# CATEGORIES loaded from config above
 
 aggregated = {c: [] for c in CATEGORIES}
 errors = []

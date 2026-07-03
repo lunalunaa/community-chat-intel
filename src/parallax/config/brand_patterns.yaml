@@ -1,0 +1,19 @@
+# Brand patterns for post_analysis.py brand audit
+#
+# Regex patterns (case-insensitive) to scan all messages for brand/impersonator
+# mentions. Each entry maps a label → regex pattern.
+#
+# Replace the example patterns with your own product's actual brand variants,
+# impersonator domains, and competitor slang.
+
+product_official: 'example[-\s]?product|example-org'
+shadow_docs_cluster: 'shadow-docs\.example|unofficial-docs\.example'
+clone_variant_a: 'exampleclone|example[\s-]?clone'
+clone_variant_b: 'nanoexample|nano[\s-]?example'
+cn_shadow_domain: 'example-product\.(cn|org\.cn)|exampleproduct(ai)?'
+colloquial_slang: 'example昵称'
+competitor_a_slang: '竞品甲|competitor[\s-]?a'
+competitor_a_official: 'competitor a product'
+competitor_b: 'competitor[\s-]?b'
+competitor_c: 'competitor[\s-]?c'
+proxy_reseller_domains: 'example-proxy\.icu|example-reseller\.com'

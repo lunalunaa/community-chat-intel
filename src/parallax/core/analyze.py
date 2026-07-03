@@ -685,7 +685,9 @@ def extract_urls(text: str) -> list[str]:
 
 def classify_url(url: str) -> tuple[str, str]:
     """Return (category, domain). Categories: official, impersonator, hf, modelscope,
-    regional_vendor, messaging, other."""
+    regional_vendor, messaging, other. Domain lists loaded from config."""
+    from parallax.core.config import load_url_domains
+
     url_l = url.lower()
     domain = re.sub(r"^https?://", "", url_l).split("/")[0]
     for d in kw.IMPERSONATOR_DOMAINS:
@@ -694,50 +696,13 @@ def classify_url(url: str) -> tuple[str, str]:
     for d in kw.OFFICIAL_DOMAINS:
         if d in url_l:
             return ("official", domain)
-    if "huggingface.co" in domain:
-        return ("hf", domain)
-    if "modelscope" in domain:
-        return ("modelscope", domain)
-    # Vendor domains associated with region-specific model providers (currently
-    # covers common providers; extend for other regions).
-    regional_vendor_domains = [
-        "volcengine.com",
-        "bytedance.com",
-        "deepseek.com",
-        "moonshot.cn",
-        "kimi.cn",
-        "zhipuai.cn",
-        "bigmodel.cn",
-        "aliyun.com",
-        "bailian",
-        "minimaxi.com",
-        "minimax.com",
-        "baidu.com",
-        "tencent.com",
-        "stepfun.com",
-        "xiaomi.com",
-        "yandex.ru",
-        "yandex.com",
-    ]
-    for d in regional_vendor_domains:
-        if d in domain:
-            return ("regional_vendor", domain)
-    messaging_domains = [
-        "feishu.cn",
-        "larksuite.com",
-        "wechat.com",
-        "weixin.qq",
-        "dingtalk.com",
-        "qq.com",
-        "telegram.",
-        "discord.",
-        "vk.com",
-        "line.me",
-        "kakao.com",
-    ]
-    for d in messaging_domains:
-        if d in domain:
-            return ("messaging", domain)
+
+    url_cfg = load_url_domains()
+    for category, domains in url_cfg.items():
+        if category in ("hf", "modelscope", "regional_vendor", "messaging"):
+            for d in domains:
+                if d in domain:
+                    return (category, domain)
     return ("other", domain)
 
 

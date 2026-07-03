@@ -1,0 +1,47 @@
+# URL classification domains for analyze.py classify_url()
+#
+# Domain patterns used to classify URLs found in messages into categories.
+# Each entry is a substring match against the URL domain (case-insensitive).
+# The first matching category wins.
+#
+# impersonator and official domains come from keywords.py (IMPERSONATOR_DOMAINS
+# and OFFICIAL_DOMAINS) — edit those lists there. This file covers the
+# remaining categories.
+
+hf:
+  - "huggingface.co"
+
+modelscope:
+  - "modelscope"
+
+regional_vendor:
+  - "volcengine.com"
+  - "bytedance.com"
+  - "deepseek.com"
+  - "moonshot.cn"
+  - "kimi.cn"
+  - "zhipuai.cn"
+  - "bigmodel.cn"
+  - "aliyun.com"
+  - "bailian"
+  - "minimaxi.com"
+  - "minimax.com"
+  - "baidu.com"
+  - "tencent.com"
+  - "stepfun.com"
+  - "xiaomi.com"
+  - "yandex.ru"
+  - "yandex.com"
+
+messaging:
+  - "feishu.cn"
+  - "larksuite.com"
+  - "wechat.com"
+  - "weixin.qq"
+  - "dingtalk.com"
+  - "qq.com"
+  - "telegram."
+  - "discord."
+  - "vk.com"
+  - "line.me"
+  - "kakao.com"
