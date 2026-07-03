@@ -37,6 +37,19 @@ jobs:
             - run: uv pip install -e . basedpyright
             - run: uv run basedpyright
 
+    test:
+        name: Tests (pytest)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+            - uses: astral-sh/setup-uv@v8.2.0
+              with:
+                  enable-cache: false
+            - run: uv python install 3.12
+            - run: uv venv
+            - run: uv pip install -e ".[dev]"
+            - run: uv run pytest tests/ -v
+
     build:
         name: Build & verify package
         runs-on: ubuntu-latest
