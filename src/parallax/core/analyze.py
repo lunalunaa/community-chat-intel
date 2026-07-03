@@ -564,11 +564,169 @@ def load_lark_export(
         )
 
 
+# ----------------------------------------------------------------------------
+# Slack export adapter
+# ----------------------------------------------------------------------------
+
+
+def load_slack_export(path: Path, salt: str) -> Iterator[Message]:
+    """Slack export adapter.
+
+    Accepts either:
+    - A single channel JSON file (array of message objects)
+    - A directory of .json files (one per channel, as exported by Slack)
+
+    Slack message structure (abridged):
+      {
+        "type": "message",
+        "user": "U12345",
+        "ts": "1234567890.123456",   # Unix epoch (float as string)
+        "text": "...",
+        "thread_ts": "1234567890.123456",  # parent message if threaded
+        "reactions": [{"name": "thumbsup", "count": 2, "users": [...]}],
+        "files": [{"id": "...", "name": "..."}]
+      }
+
+    Bot messages (user starting with "B") and message-subtypes like
+    "channel_join", "channel_leave" are skipped.
+    """
+    import zipfile
+
+    files_to_process: list[tuple[str, dict]] = []  # (channel_name, data)
+
+    if path.is_dir():
+        for f in sorted(path.glob("*.json")):
+            data = json.loads(f.read_text(encoding="utf-8"))
+            channel_name = f.stem
+            files_to_process.append((channel_name, data))
+    elif path.suffix == ".zip":
+        with zipfile.ZipFile(path) as zf:
+            for name in sorted(zf.namelist()):
+                if name.endswith(".json"):
+                    data = json.loads(zf.read(name))
+                    channel_name = Path(name).stem
+                    files_to_process.append((channel_name, data))
+    else:
+        # Single channel JSON file
+        data = json.loads(path.read_text(encoding="utf-8"))
+        channel_name = path.stem
+        files_to_process.append((channel_name, data))
+
+    for channel_name, data in files_to_process:
+        # Slack exports can be a bare array or wrapped in {"messages": [...]}
+        msgs = data if isinstance(data, list) else data.get("messages", [])
+        for msg in msgs:
+            if msg.get("type") != "message":
+                continue
+            subtype = msg.get("subtype")
+            if subtype in (
+                "channel_join",
+                "channel_leave",
+                "channel_name",
+                "channel_purpose",
+                "channel_topic",
+            ):
+                continue
+            user = msg.get("user", "")
+            if user.startswith("B"):  # Bot user
+                continue
+            ts_str = msg.get("ts", "")
+            try:
+                ts = datetime.fromtimestamp(float(ts_str), tz=timezone.utc)
+            except (ValueError, TypeError):
+                ts = _parse_ts(ts_str)
+            reactions = [
+                {"emoji": r.get("name", ""), "count": r.get("count", 0)}
+                for r in msg.get("reactions", [])
+            ]
+            yield Message(
+                platform="slack",
+                channel=channel_name,
+                message_id=msg.get("ts", ""),
+                author_id=_hash_id(user, salt) if user else "unknown",
+                author_name=msg.get("user", "unknown"),
+                timestamp=ts,
+                content=msg.get("text") or "",
+                reply_to_message_id=msg.get("thread_ts")
+                if msg.get("thread_ts") != ts_str
+                else None,
+                reactions=reactions,
+                attachment_count=len(msg.get("files", [])),
+            )
+
+
+# ----------------------------------------------------------------------------
+# Generic CSV adapter
+# ----------------------------------------------------------------------------
+
+
+def load_csv_export(path: Path, salt: str) -> Iterator[Message]:
+    """Generic CSV adapter for tabular chat exports.
+
+    Expects at minimum a 'content' column. Recognized columns (case-insensitive):
+      - content / text / message       → message text
+      - author / user / username / sender  → author name or id
+      - author_id / user_id / sender_id → author id (hashed if present)
+      - timestamp / ts / time / date    → message timestamp
+      - channel / channel_name          → channel label
+      - message_id / id                 → message id
+      - reply_to / reply_to_message_id  → parent message id
+
+    Unknown columns are ignored. Missing timestamps default to epoch.
+    Missing author defaults to 'unknown'. This adapter is designed for
+    exports from tools like ChatExporter, custom scripts, or spreadsheet
+    dumps where the user maps columns to the expected names.
+    """
+    import csv
+
+    with open(path, "r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        # Build column-name lookup (case-insensitive)
+        colmap: dict[str, str] = {}
+        for field in reader.fieldnames or []:
+            colmap[field.lower().strip()] = field
+
+        def get(row: dict, *keys: str) -> str:
+            for k in keys:
+                col = colmap.get(k.lower())
+                if col:
+                    val = row.get(col, "")
+                    if val:
+                        return val.strip()
+            return ""
+
+        for row in reader:
+            content = get(row, "content", "text", "message")
+            if not content:
+                continue
+            author_name = get(row, "author", "user", "username", "sender")
+            author_id_raw = get(row, "author_id", "user_id", "sender_id") or author_name
+            ts_str = get(row, "timestamp", "ts", "time", "date")
+            channel = get(row, "channel", "channel_name") or "csv-import"
+            msg_id = get(row, "message_id", "id")
+            reply_to = get(row, "reply_to", "reply_to_message_id")
+
+            yield Message(
+                platform="csv",
+                channel=channel,
+                message_id=msg_id,
+                author_id=_hash_id(author_id_raw, salt) if author_id_raw else "unknown",
+                author_name=author_name or "unknown",
+                timestamp=_parse_ts(ts_str),
+                content=content,
+                reply_to_message_id=reply_to or None,
+                reactions=[],
+                attachment_count=0,
+            )
+
+
 ADAPTERS = {
     "discord": load_discord_export,
     "telegram": load_telegram_export,
     "canonical": load_canonical,
     "lark": load_lark_export,
+    "slack": load_slack_export,
+    "csv": load_csv_export,
 }
 
 

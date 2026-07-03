@@ -38,4 +38,4 @@ parallax-crosstabs = "parallax.core.crosstabs:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-parallax = ["templates/*.md", "config/*.yaml", "config/*.md"]
+parallax = ["templates/*.md", "config/*.yaml", "config/*.md", "config/*.json"]

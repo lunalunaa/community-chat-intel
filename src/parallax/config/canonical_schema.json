@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lunalunaa/parallax/blob/main/src/parallax/config/canonical_schema.json",
+  "title": "Parallax Canonical Chat Export",
+  "description": "Schema for the --platform canonical input format. Use this when no native adapter exists for your platform — produce a JSON file matching this schema and pass it with --platform canonical.",
+  "type": "object",
+  "required": ["messages"],
+  "properties": {
+    "channel": {
+      "type": "object",
+      "description": "Optional channel metadata.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "description": "Array of message objects in canonical format.",
+      "items": { "$ref": "#/$defs/message" }
+    }
+  },
+  "$defs": {
+    "message": {
+      "type": "object",
+      "required": ["author_id", "timestamp", "content"],
+      "properties": {
+        "platform": {
+          "type": "string",
+          "description": "Platform label (e.g. 'whatsapp', 'line'). Defaults to 'canonical'.",
+          "default": "canonical"
+        },
+        "channel": {
+          "type": "string",
+          "description": "Channel or room name.",
+          "default": ""
+        },
+        "message_id": {
+          "type": "string",
+          "description": "Unique message identifier. Empty string if unknown."
+        },
+        "author_id": {
+          "type": "string",
+          "description": "Author identifier. Will be SHA-256 hashed unless prefixed with 'sha256:' or 'hash:'."
+        },
+        "author_name": {
+          "type": "string",
+          "description": "Display name of the author.",
+          "default": "unknown"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO 8601 timestamp (e.g. '2026-01-15T12:00:00+00:00' or '2026-01-15T12:00:00Z').",
+          "format": "date-time"
+        },
+        "content": {
+          "type": "string",
+          "description": "Message text content."
+        },
+        "reply_to_message_id": {
+          "type": ["string", "null"],
+          "description": "Message ID this message replies to, or null."
+        },
+        "reactions": {
+          "type": "array",
+          "description": "Reactions on this message.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "emoji": { "type": "string" },
+              "count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "attachment_count": {
+          "type": "integer",
+          "description": "Number of attachments (images, files, etc.).",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    }
+  }
+}

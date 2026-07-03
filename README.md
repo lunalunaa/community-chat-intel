@@ -145,10 +145,14 @@ src/parallax/
 
 ## Getting chat exports
 
-- **Discord** — [DiscordChatExporter](https://github.com/Tyrrrz/DiscordChatExporter)
-- **Telegram** — Telegram Desktop → group → Export chat history → JSON
-- **Lark/Feishu** — [@larksuite/cli](https://github.com/larksuite/cli)
-- **Anything else** — match the canonical schema (`parallax-analyze --help`) and use `--platform canonical`
+| Platform | `--platform` | How to export |
+|---|---|---|
+| Discord | `discord` | [DiscordChatExporter](https://github.com/Tyrrrz/DiscordChatExporter) → JSON |
+| Telegram | `telegram` | Telegram Desktop → group → Export chat history → JSON |
+| Lark/Feishu | `lark` | [@larksuite/cli](https://github.com/larksuite/cli) `im +chat-messages-list` |
+| Slack | `slack` | Slack workspace → Settings → Export workspace data (zip or directory of JSONs) |
+| CSV (generic) | `csv` | Any tool that produces a CSV with a `content` column (plus optional `author`, `timestamp`, `channel`) |
+| Anything else | `canonical` | Match the [canonical JSON schema](src/parallax/config/canonical_schema.json) |
 
 ## Privacy
 
