@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-stream synthesis: feed A+B+C+D outputs into MiMo v2.5-Pro and produce findings_final.md."""
+"""narrative_synthesis.py: feed Stream A+B+C+D outputs into a stronger LLM and produce findings_final_v2.md."""
 
 import json
 import os

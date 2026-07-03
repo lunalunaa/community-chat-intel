@@ -19,10 +19,11 @@ dependencies = [
 chatintel-analyze = "chatintel.core.analyze:main"
 chatintel-topics = "chatintel.streams.topics:main"
 chatintel-crosstabs = "chatintel.core.crosstabs:main"
-# stream_b/c/c-retry/d, cross_stream_synthesis, build_final_report, and
-# post_analysis are one-shot scripts (module-level code, no main()) — run
-# them with `python -m chatintel.streams.<name>` instead of a console
-# script; see README.md's Quick start / docs/PIPELINE.md for exact invocations.
+# semantic_retrieval, fact_extraction, fact_extraction_retry, deterministic_analytics,
+# narrative_synthesis, build_final_report, and post_analysis are one-shot scripts
+# (module-level code, no main()) — run them with `python -m chatintel.streams.<name>`
+# instead of a console script; see README.md's Quick start / docs/PIPELINE.md for
+# exact invocations.
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -34,10 +34,12 @@ Built to answer a real question — *"how does our non-English-speaking user com
            FAISS + LLM   ~100-msg      Pareto, stickiness,
            narrative     chunk         gateway mix, reply
            synthesis                   graph, temporal growth
+        (semantic_    (fact_        (deterministic_
+         retrieval.py)  extraction.py) analytics.py)
                  │             │             │
                  └─────────────┼─────────────┘
                                │
-                 cross_stream_synthesis.py
+                 narrative_synthesis.py
                  (single large-context LLM call)
                                │
                      findings_final.md
@@ -95,10 +97,10 @@ chatintel-crosstabs --users-json ./out/users.json --region jp --out ./out/crosst
 # 5. Review ./out/report.md, ./out/stats.json, ./out/crosstabs.md
 ```
 
-The remaining 4-stream deep-analysis scripts (`stream_b_embed_retrieve.py`, `stream_c_fact_extract.py`, `stream_c_retry.py`, `stream_d_v4.py`, `cross_stream_synthesis.py`, `build_final_report.py`, `post_analysis.py`) are one-shot scripts, not console commands — run them as modules from an activated venv, e.g.:
+The remaining 4-stream deep-analysis scripts (`semantic_retrieval.py`, `fact_extraction.py`, `fact_extraction_retry.py`, `deterministic_analytics.py`, `narrative_synthesis.py`, `build_final_report.py`, `post_analysis.py`) are one-shot scripts, not console commands — run them as modules from an activated venv, e.g.:
 
 ```bash
-python -m chatintel.streams.stream_d_v4
+python -m chatintel.streams.deterministic_analytics
 ```
 
 For the full pipeline (semantic retrieval, structured fact extraction, deterministic analytics, cross-stream synthesis, final report with recommendations), see [`docs/PIPELINE.md`](docs/PIPELINE.md) — it documents exact commands, environment variables, and a real cost/runtime breakdown.
@@ -134,17 +136,17 @@ Adding a new language or region is a matter of adding one `LanguageProfile` / `R
 
 ## Adapting for your own community
 
-All stream scripts (`stream_b_embed_retrieve.py`, `stream_c_fact_extract.py`, `stream_c_retry.py`, `stream_d_v4.py`, `post_analysis.py`, `cross_stream_synthesis.py`, `build_final_report.py`) read their configuration from environment variables instead of hardcoded paths, so you can point the whole pipeline at your own dataset without editing code:
+All stream scripts (`semantic_retrieval.py`, `fact_extraction.py`, `fact_extraction_retry.py`, `deterministic_analytics.py`, `post_analysis.py`, `narrative_synthesis.py`, `build_final_report.py`) read their configuration from environment variables instead of hardcoded paths, so you can point the whole pipeline at your own dataset without editing code:
 
 | Variable | Purpose | Default |
 |---|---|---|
 | `CHAT_JSONL` | Path to the raw NDJSON export | `./data/pages.jsonl` |
 | `OUT_DIR` | Output directory for all streams | `./out` |
 | `SALT_FILE` | User-ID hashing salt (auto-generate with `chatintel-analyze` on first run) | `./user_hash_salt.key` |
-| `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` | Manually-verified live membership (Stream D denominator) | `0` (must be set for meaningful output) |
+| `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` | Manually-verified live membership (`deterministic_analytics.py` denominator) | `0` (must be set for meaningful output) |
 | `GROUND_TRUTH_SOURCE` | Free-text provenance note for the ground-truth numbers | `"platform admin UI, manually verified"` |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_MODEL_PRO` | Which provider/model your LLM CLI should use | `nous` / `xiaomi/mimo-v2.5` / `xiaomi/mimo-v2.5-pro` (example — use whatever you have configured) |
-| `COMMUNITY_NAME`, `CORPUS_DESCRIPTION`, `GROUND_TRUTH_SUMMARY` | Free-text context injected into the cross-stream synthesis prompt | generic examples |
+| `COMMUNITY_NAME`, `CORPUS_DESCRIPTION`, `GROUND_TRUTH_SUMMARY` | Free-text context injected into the narrative-synthesis prompt | generic examples |
 | `SURVEY_SUBJECT`, `STRUCTURAL_CONTEXT`, `RECOMMENDATION_FOCUS_AREAS` | Free-text context injected into the recommendations-generation prompt | generic placeholders |
 | `REPORT_TITLE`, `REPORT_SUBJECT`, `REPORT_PERIOD`, `REPORT_CLASSIFICATION` | Front-matter for the final assembled report | generic placeholders |
 
@@ -165,14 +167,14 @@ src/chatintel/
 │   ├── keywords.py                     # keyword dictionaries — tune for your own product/ecosystem
 │   └── crosstabs.py                    # cross-tabulation helper (chatintel-crosstabs)
 ├── streams/
-│   ├── topics.py                       # Stream A: LLM topic-tagging (chatintel-topics)
-│   ├── stream_b_embed_retrieve.py      # Stream B: local embeddings + FAISS semantic search
-│   ├── stream_c_fact_extract.py        # Stream C: structured LLM fact extraction
-│   ├── stream_c_retry.py               # Stream C: tolerant-JSON retry pass
-│   ├── stream_d_v4.py                  # Stream D: ground-truth-anchored deterministic analytics
-│   ├── cross_stream_synthesis.py       # feeds all four streams into one LLM synthesis call
-│   ├── build_final_report.py           # assembles methodology + findings + recommendations
-│   └── post_analysis.py                # brand/impersonator audit, cost-complaint drill, CSV exports
+│   ├── topics.py                        # Stream A: LLM topic-tagging (chatintel-topics)
+│   ├── semantic_retrieval.py            # Stream B: local embeddings + FAISS semantic search
+│   ├── fact_extraction.py               # Stream C: structured LLM fact extraction
+│   ├── fact_extraction_retry.py         # Stream C: tolerant-JSON retry pass
+│   ├── deterministic_analytics.py       # Stream D: ground-truth-anchored deterministic analytics
+│   ├── narrative_synthesis.py           # feeds all four streams into one LLM synthesis call
+│   ├── build_final_report.py            # assembles methodology + findings + recommendations
+│   └── post_analysis.py                 # brand/impersonator audit, cost-complaint drill, CSV exports
 └── templates/
     └── report-template.md              # report skeleton with {{stats.xxx}} placeholders
 

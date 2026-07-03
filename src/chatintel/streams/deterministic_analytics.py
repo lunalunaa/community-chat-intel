@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stream D v4 — pinned to ground truth from a manually-verified membership count.
+"""Stream D (deterministic_analytics.py): pinned to ground truth from a manually-verified membership count.
 
 This script is written for chat platforms (Feishu/Lark, Discord, Slack, etc.)
 that don't reliably emit "member left" events, so join-event counts alone

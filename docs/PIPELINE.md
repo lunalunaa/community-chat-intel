@@ -31,7 +31,7 @@ The pipeline runs four parallel **streams** against the same raw chat export, th
                     │             │             │
                     └─────────────┼─────────────┘
                                   │
-                    cross_stream_synthesis.py
+                    narrative_synthesis.py
                     (MiMo v2.5-Pro, single 36K-char prompt)
                                   │
                         findings_final_v2.md
@@ -69,7 +69,7 @@ All streams assume:
 
 ## Stream B — Semantic Retrieval + Narrative Synthesis
 
-**File:** `stream_b_embed_retrieve.py` (204 lines)
+**File:** `semantic_retrieval.py` (204 lines)
 
 ### What it does
 
@@ -124,14 +124,14 @@ Grouped by research question:
 
 ## Stream C — Structured Fact Extraction
 
-**Files:** `stream_c_fact_extract.py` (221 lines), `stream_c_retry.py` (243 lines)
+**Files:** `fact_extraction.py` (221 lines), `fact_extraction_retry.py` (243 lines)
 
 ### What it does
 
 1. Splits all content messages into windows of ~100 consecutive messages (preserving conversational order)
 2. Feeds each chunk to MiMo v2.5 with a JSON schema requesting 10 categories of structured facts
 3. Aggregates facts across all chunks
-4. On failure, `stream_c_retry.py` re-runs failed chunks with tolerant JSON parsing
+4. On failure, `fact_extraction_retry.py` re-runs failed chunks with tolerant JSON parsing
 
 ### The 10 fact categories
 
@@ -167,7 +167,7 @@ Grouped by research question:
 ### Execution flow
 
 ```
-stream_c_fact_extract.py
+fact_extraction.py
   ├── Load messages, sort chronologically
   ├── Chunk into windows of 100
   ├── For each chunk (concurrency=4):
@@ -180,7 +180,7 @@ stream_c_fact_extract.py
   └── Write aggregated_facts.json + summary.json
 
 If extraction_errors.json is non-empty:
-stream_c_retry.py
+fact_extraction_retry.py
   ├── Reread error chunks
   ├── Retry with tolerant JSON parsing:
   │     ├── Strict json.loads
@@ -212,7 +212,7 @@ stream_c_retry.py
 - `stream_d_analysis.py` (297 lines) — original version
 - `stream_d_v2.py` — membership-aware (joined-via-system-message reconciliation)
 - `stream_d_v3.py` — correct poster-vs-member reconciliation (cross-tenant user handling)
-- **`stream_d_v4.py`** (223 lines) — **final, ground-truth-anchored version**
+- **`deterministic_analytics.py`** (223 lines) — **final, ground-truth-anchored version**
 
 ### What it does (v4)
 
@@ -274,7 +274,7 @@ URLs in message content are matched against domain patterns to classify gateway 
 
 ## Cross-Stream Synthesis
 
-**File:** `cross_stream_synthesis.py` (159 lines)
+**File:** `narrative_synthesis.py` (159 lines)
 
 ### What it does
 
@@ -384,22 +384,22 @@ chatintel-topics \
     --out ./out/topics.json
 
 # 3. Stream D — deterministic analysis (run first; cheapest, catches data issues)
-python -m chatintel.streams.stream_d_v4
+python -m chatintel.streams.deterministic_analytics
 #    ↑ set CHAT_JSONL, OUT_DIR, GROUND_TRUTH_HUMANS/BOTS env vars before running
 
 # 4. Stream B — semantic retrieval + synthesis
-python -m chatintel.streams.stream_b_embed_retrieve
+python -m chatintel.streams.semantic_retrieval
 #    ↑ set CHAT_JSONL, OUT_DIR env vars before running
 #    Slowest step (embedding). Cache survives reruns.
 
 # 5. Stream C — structured fact extraction
-python -m chatintel.streams.stream_c_fact_extract
+python -m chatintel.streams.fact_extraction
 #    ↑ set CHAT_JSONL, OUT_DIR env vars before running
 #    If extraction_errors.json is non-empty:
-python -m chatintel.streams.stream_c_retry
+python -m chatintel.streams.fact_extraction_retry
 
 # 6. Cross-stream synthesis
-python -m chatintel.streams.cross_stream_synthesis
+python -m chatintel.streams.narrative_synthesis
 #    → findings_final_v2.md
 
 # 7. Post-analysis drills
@@ -430,7 +430,7 @@ All stream scripts have hardcoded paths at the top. Before running:
 CHAT_JSONL = Path("/path/to/your/pages.jsonl")
 OUT_DIR = Path("/path/to/your/out_full")
 
-# In stream_d_v4.py, also edit:
+# In deterministic_analytics.py, also edit:
 GROUND_TRUTH_HUMANS = 1234   # from platform UI
 GROUND_TRUTH_BOTS = 0        # from platform UI
 ```
@@ -495,11 +495,11 @@ community-chat-intel/
 │   │
 │   ├── streams/
 │   │   ├── topics.py                    # Stream A: LLM topic classification (chatintel-topics)
-│   │   ├── stream_b_embed_retrieve.py   # Stream B: semantic search + synthesis
-│   │   ├── stream_c_fact_extract.py     # Stream C: structured fact extraction
-│   │   ├── stream_c_retry.py            # Stream C: tolerant JSON retry
-│   │   ├── stream_d_v4.py               # Stream D v4: ground-truth-anchored (AUTHORITATIVE)
-│   │   ├── cross_stream_synthesis.py    # Stream synthesis → findings_final_v2.md
+│   │   ├── semantic_retrieval.py        # Stream B: semantic search + synthesis
+│   │   ├── fact_extraction.py           # Stream C: structured fact extraction
+│   │   ├── fact_extraction_retry.py     # Stream C: tolerant JSON retry
+│   │   ├── deterministic_analytics.py   # Stream D: ground-truth-anchored (AUTHORITATIVE)
+│   │   ├── narrative_synthesis.py       # Stream synthesis → findings_final_v2.md
 │   │   ├── build_final_report.py        # Final report assembly
 │   │   └── post_analysis.py             # Brand audit, cost drill, CSV exports
 │   │

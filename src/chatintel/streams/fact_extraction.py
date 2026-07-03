@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Retry the 16 failed chunks from Stream C, with tolerant JSON parsing.
+"""Stream C (fact_extraction.py): structured fact extraction over conversation chunks.
 
-Uses the exact same prompt and chunk definitions as stream_c_fact_extract.py,
-but:
-  - Accepts trailing commas (MiMo's main failure mode)
-  - Falls back to json5-style repair if needed
-  - Writes recovered results into chunks_cache.jsonl so the main aggregation
-    sees them
-  - Regenerates summary.json and aggregated_facts.json
+Splits messages into ~100-message chunks preserving conversational order, feeds
+each chunk to an LLM with a structured-output schema, aggregates structured
+facts across all chunks. See fact_extraction_retry.py for the tolerant-JSON
+retry pass over any chunks that fail strict parsing.
 """
 
 import hashlib
@@ -21,7 +18,10 @@ from pathlib import Path
 
 CHAT_JSONL = Path(os.environ.get("CHAT_JSONL", "./data/pages.jsonl"))
 OUT_DIR = Path(os.environ.get("OUT_DIR", "./out/stream_c"))
-SALT = Path(os.environ.get("SALT_FILE", "./user_hash_salt.key")).read_text().strip()
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+SALT_FILE = Path(os.environ.get("SALT_FILE", "./user_hash_salt.key"))
+SALT = SALT_FILE.read_text().strip() if SALT_FILE.exists() else "default-salt"
 
 
 def hash_user(uid):
@@ -43,6 +43,7 @@ def parse_ts(s):
     return None
 
 
+print("[stream_c] loading messages...", flush=True)
 messages = []
 for line in CHAT_JSONL.open():
     try:
@@ -69,12 +70,15 @@ for line in CHAT_JSONL.open():
             "content": content.strip()[:800],
         }
     )
-messages.sort(key=lambda x: x["ts"])
 
+messages.sort(key=lambda x: x["ts"])
+print(f"[stream_c] {len(messages):,} messages loaded", flush=True)
+
+# ===== Chunk into windows of ~100 messages =====
 CHUNK_SIZE = 100
 chunks = [messages[i : i + CHUNK_SIZE] for i in range(0, len(messages), CHUNK_SIZE)]
+print(f"[stream_c] {len(chunks)} chunks of ≤{CHUNK_SIZE} messages", flush=True)
 
-# Same prompt as original
 EXTRACTION_PROMPT = """You are analyzing a chunk of chat messages from a product's community chat (Chinese-language, on a Feishu-style platform). Extract structured facts. Output a single valid JSON object matching this schema (omit arrays that have no instances):
 
 {
@@ -95,7 +99,6 @@ Rules:
 - If a chunk is mostly off-topic chatter, return mostly empty arrays.
 - Use actual user names from messages when present (anonymize only if clearly harmful).
 - Keep all field values concise (<50 chars where possible).
-- IMPORTANT: Output STRICTLY valid JSON. No trailing commas. No comments. Just the JSON object.
 - Output ONLY the JSON object, no prose before or after.
 
 MESSAGES:
@@ -105,12 +108,13 @@ MESSAGES:
 def format_chunk(chunk):
     out = []
     for m in chunk:
+        # truncate long contents, include sender
         c = m["content"].replace("\n", " ")[:500]
         out.append(f"[{m['ts']}] {m['name']}: {c}")
     return "\n".join(out)
 
 
-def call_mimo(prompt, timeout=180):
+def call_kimi(prompt, timeout=180):
     cmd = [
         "hermes",
         "chat",
@@ -134,96 +138,79 @@ def call_mimo(prompt, timeout=180):
     return "\n".join(lines).strip()
 
 
-def tolerant_json_parse(raw: str):
-    """Try strict json first, then strip trailing commas, then json5-ish repair."""
-    # Strip markdown fences
-    cleaned = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
-    # Find object
-    m = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if not m:
-        return None, "no_json_found"
-    body = m.group()
-    # 1. strict
-    try:
-        return json.loads(body), None
-    except json.JSONDecodeError:
-        pass
-    # 2. strip trailing commas: ,] -> ], ,} -> }
-    body2 = re.sub(r",(\s*[\]}])", r"\1", body)
-    try:
-        return json.loads(body2), None
-    except json.JSONDecodeError:
-        pass
-    # 3. try json5 if available
-    try:
-        import json5
-
-        return json5.loads(body), None
-    except ImportError:
-        pass
-    except Exception:
-        pass
-    # 4. try the last `{ ... }` in case MiMo concatenated multiple outputs
-    last = re.findall(r"\{[^\{\}]*(?:\{[^\{\}]*\}[^\{\}]*)*\}", body, re.DOTALL)
-    for candidate in reversed(last):
-        candidate2 = re.sub(r",(\s*[\]}])", r"\1", candidate)
-        try:
-            return json.loads(candidate2), None
-        except Exception:
-            continue
-    return None, "all_parsers_failed"
-
-
 def extract_from_chunk(idx, chunk):
     prompt = EXTRACTION_PROMPT + format_chunk(chunk)
     try:
-        raw = call_mimo(prompt)
+        raw = call_kimi(prompt)
     except subprocess.TimeoutExpired:
         return idx, {"_error": "timeout"}
     except subprocess.CalledProcessError as e:
         return idx, {"_error": f"subprocess_error: {e.stderr[:200]}"}
-    facts, err = tolerant_json_parse(raw)
-    if facts is None:
-        return idx, {"_error": err, "_raw": raw[:800]}
-    return idx, facts
+
+    # strip markdown fences, find json object
+    cleaned = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+    m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if not m:
+        return idx, {"_error": "no_json_found", "_raw": raw[:500]}
+    try:
+        facts = json.loads(m.group())
+        return idx, facts
+    except json.JSONDecodeError as e:
+        return idx, {"_error": f"json_parse_failed: {e}", "_raw": raw[:500]}
 
 
-# Load errors list
-errors = json.load((OUT_DIR / "extraction_errors.json").open())
-error_idxs = [e["chunk_idx"] for e in errors]
-print(f"Retrying {len(error_idxs)} failed chunks: {error_idxs}", flush=True)
+# ===== Cache =====
+CACHE_FILE = OUT_DIR / "chunks_cache.jsonl"
+cache = {}
+if CACHE_FILE.exists():
+    for line in CACHE_FILE.open():
+        try:
+            d = json.loads(line)
+            cache[d["chunk_idx"]] = d["facts"]
+        except Exception:
+            pass
+    print(f"[stream_c] loaded {len(cache)} cached chunks", flush=True)
 
-results = {}
+# ===== Run with concurrency =====
+CONCURRENCY = 4
+all_facts = {}
+
+chunks_to_do = [(i, c) for i, c in enumerate(chunks) if i not in cache]
+print(
+    f"[stream_c] {len(chunks_to_do)}/{len(chunks)} chunks to process (concurrency={CONCURRENCY})",
+    flush=True,
+)
+
+completed = len(cache)
+all_facts.update(cache)
+
 import time
 
 t0 = time.time()
-with ThreadPoolExecutor(max_workers=4) as ex:
-    futures = {ex.submit(extract_from_chunk, i, chunks[i]): i for i in error_idxs}
+with (
+    ThreadPoolExecutor(max_workers=CONCURRENCY) as ex,
+    CACHE_FILE.open("a") as cache_fh,
+):
+    futures = {ex.submit(extract_from_chunk, i, c): i for i, c in chunks_to_do}
     for fut in as_completed(futures):
         idx, facts = fut.result()
-        results[idx] = facts
-        status = "✓" if "_error" not in facts else f"✗ {facts['_error'][:60]}"
-        print(f"  chunk {idx}: {status}", flush=True)
-
-# Append successes to chunks_cache.jsonl
-cache_file = OUT_DIR / "chunks_cache.jsonl"
-with cache_file.open("a") as fh:
-    for idx, facts in results.items():
-        if "_error" not in facts:
-            fh.write(
-                json.dumps({"chunk_idx": idx, "facts": facts}, ensure_ascii=False)
-                + "\n"
+        all_facts[idx] = facts
+        cache_fh.write(
+            json.dumps({"chunk_idx": idx, "facts": facts}, ensure_ascii=False) + "\n"
+        )
+        cache_fh.flush()
+        completed += 1
+        elapsed = time.time() - t0
+        rate = completed / max(1, elapsed) if elapsed > 0 else 0
+        eta = (len(chunks) - completed) / max(0.01, rate) if rate > 0 else 0
+        if completed % 5 == 0 or completed == len(chunks):
+            print(
+                f"[stream_c] {completed}/{len(chunks)} chunks done ({elapsed:.0f}s elapsed, ~{eta:.0f}s ETA)",
+                flush=True,
             )
 
-# Rebuild aggregation
-print("\nRebuilding aggregates...", flush=True)
-all_facts = {}
-for line in cache_file.open():
-    try:
-        d = json.loads(line)
-        all_facts[d["chunk_idx"]] = d["facts"]
-    except Exception:
-        continue
+# ===== Aggregate =====
+print(f"[stream_c] aggregating facts across {len(all_facts)} chunks", flush=True)
 
 CATEGORIES = [
     "install_problems",
@@ -239,10 +226,10 @@ CATEGORIES = [
 ]
 
 aggregated = {c: [] for c in CATEGORIES}
-remaining_errors = []
+errors = []
 for idx, facts in sorted(all_facts.items()):
     if "_error" in facts:
-        remaining_errors.append({"chunk_idx": idx, "error": facts["_error"]})
+        errors.append({"chunk_idx": idx, "error": facts["_error"]})
         continue
     for cat in CATEGORIES:
         items = facts.get(cat, [])
@@ -252,18 +239,21 @@ for idx, facts in sorted(all_facts.items()):
                     item["_chunk_idx"] = idx
                     aggregated[cat].append(item)
 
+# Save full aggregated
 (OUT_DIR / "aggregated_facts.json").write_text(
     json.dumps(aggregated, indent=2, ensure_ascii=False)
 )
 (OUT_DIR / "extraction_errors.json").write_text(
-    json.dumps(remaining_errors, indent=2, ensure_ascii=False)
+    json.dumps(errors, indent=2, ensure_ascii=False)
 )
 
+# Summary counts
 summary = {cat: len(items) for cat, items in aggregated.items()}
 summary["_total_chunks"] = len(all_facts)
-summary["_successful_chunks"] = len(all_facts) - len(remaining_errors)
-summary["_error_chunks"] = len(remaining_errors)
+summary["_successful_chunks"] = len(all_facts) - len(errors)
+summary["_error_chunks"] = len(errors)
 
+# Sub-categorizations
 provider_counts = {}
 for item in aggregated["provider_usage"]:
     p = item.get("provider_or_gateway", "unknown")
@@ -294,11 +284,10 @@ for item in aggregated["competitor_mentions"]:
     )
 )
 
-print("\n=== RETRY RESULT ===")
-print(f"  Retried: {len(error_idxs)}")
-print(f"  Recovered: {sum(1 for r in results.values() if '_error' not in r)}")
-print(f"  Still failing: {len(remaining_errors)}")
-print("  Total facts now:")
+print(
+    f"[stream_c] DONE. {len(all_facts) - len(errors)} successful, {len(errors)} errors",
+    flush=True,
+)
 for cat, count in summary.items():
     if not cat.startswith("_"):
-        print(f"    {cat:30s}: {count}")
+        print(f"    {cat}: {count}", flush=True)

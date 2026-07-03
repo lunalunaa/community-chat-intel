@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stream B: Local embeddings + retrieval queries.
+"""Stream B (semantic_retrieval.py): local embeddings + retrieval queries.
 
 Embeds all non-system messages with a multilingual model, builds a FAISS index,
 runs structured retrieval queries, feeds top-K results to an LLM for synthesis.
