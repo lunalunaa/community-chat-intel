@@ -175,9 +175,9 @@ def tolerant_json_parse(raw: str):
         return json.loads(body2), None
     except json.JSONDecodeError:
         pass
-    # 3. try json5 if available
+    # 3. try json5 if available (optional soft dependency, not in requirements.txt)
     try:
-        import json5
+        import json5  # type: ignore[import-not-found]
 
         return json5.loads(body), None
     except ImportError:
@@ -223,7 +223,7 @@ with ThreadPoolExecutor(max_workers=4) as ex:
     for fut in as_completed(futures):
         idx, facts = fut.result()
         results[idx] = facts
-        status = "✓" if "_error" not in facts else f"✗ {facts['_error'][:60]}"
+        status = "✓" if "_error" not in facts else f"✗ {str(facts.get('_error'))[:60]}"
         print(f"  chunk {idx}: {status}", flush=True)
 
 # Append successes to chunks_cache.jsonl

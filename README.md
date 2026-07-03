@@ -77,6 +77,8 @@ pip install -e .
 
 Either way you end up with the `chatintel-analyze` / `chatintel-topics` / `chatintel-crosstabs` console scripts on `PATH`:
 
+> **Editor / type-checker setup:** this repo ships a `pyrightconfig.json` pointing at `.venv` (`typeCheckingMode: "standard"`), so `basedpyright`/Pyright and editors that shell out to it (Zed, VS Code + Pylance, Neovim) resolve `faiss` / `numpy` / `sentence-transformers` / the `chatintel` package correctly — but **only after you've actually run `uv sync` or `pip install -e .` above**. If your editor reports dozens of "missing import" errors or fails to launch a Python kernel, that almost always means no `.venv` exists yet (or your editor is pointed at a different interpreter) — create the venv first, then point your editor/kernel picker at `.venv/bin/python`. `sentence-transformers`/`faiss-cpu`/`torch` are large (~1-2 GB combined); the first `sync`/`install` can take a few minutes.
+
 ```bash
 # 1. Get a chat export (Discord/Telegram/Lark — see "Getting chat exports" below)
 #    Result: e.g. ~/Downloads/discord_export.json

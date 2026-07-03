@@ -98,19 +98,18 @@ print(f"[stream_b] {len(messages):,} messages to embed", flush=True)
 emb_cache = OUT_DIR / "embeddings.npy"
 ids_cache = OUT_DIR / "ids.json"
 
+embs: "np.ndarray | None" = None
 if emb_cache.exists() and ids_cache.exists():
     print(f"[stream_b] loading cached embeddings from {emb_cache}", flush=True)
-    embs = np.load(str(emb_cache))
+    loaded = np.load(str(emb_cache))
     cached_ids = json.loads(ids_cache.read_text())
     if cached_ids == [m["id"] for m in messages]:
         print("[stream_b] cache matches; skipping embed pass", flush=True)
+        embs = loaded
     else:
         print("[stream_b] cache mismatch; re-embedding", flush=True)
-        emb_cache = None
-else:
-    emb_cache = None
 
-if emb_cache is None or not Path(emb_cache).exists():
+if embs is None:
     print(
         "[stream_b] embedding... (this is the slow part, ~2-5 min on CPU)", flush=True
     )
@@ -118,13 +117,14 @@ if emb_cache is None or not Path(emb_cache).exists():
 
     t0 = time.time()
     texts = [m["content"] for m in messages]
-    embs = model.encode(
+    encoded = model.encode(
         texts,
         batch_size=32,
         show_progress_bar=True,
         convert_to_numpy=True,
         normalize_embeddings=True,
     )
+    embs = np.asarray(encoded)
     elapsed = time.time() - t0
     print(
         f"[stream_b] embedded {len(texts):,} messages in {elapsed:.0f}s ({len(texts) / elapsed:.0f}/s)",

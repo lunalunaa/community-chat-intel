@@ -168,6 +168,8 @@ def _cjk_family_ratio(text: str, profile: LanguageProfile) -> float:
     if not stripped:
         return 0.0
     pattern = profile.script_pattern
+    if pattern is None:
+        return 0.0
     hits = sum(1 for c in stripped if pattern.match(c))
     return hits / len(stripped)
 

@@ -742,6 +742,18 @@ def is_question(text: str, question_pattern: re.Pattern) -> bool:
     return bool(question_pattern.search(text))
 
 
+def _min_ts(msgs: list[Message]) -> str | None:
+    if not msgs:
+        return None
+    return min(m.timestamp for m in msgs).isoformat()
+
+
+def _max_ts(msgs: list[Message]) -> str | None:
+    if not msgs:
+        return None
+    return max(m.timestamp for m in msgs).isoformat()
+
+
 # ----------------------------------------------------------------------------
 # Main pipeline
 # ----------------------------------------------------------------------------
@@ -963,12 +975,8 @@ def run_pipeline(
             # Back-compat alias for the original Chinese-specific key name
             "channel_zh_message_counts": dict(channel_target_counts),
             "date_range": [
-                min((m.timestamp for m in filtered), default=None).isoformat()
-                if filtered
-                else None,
-                max((m.timestamp for m in filtered), default=None).isoformat()
-                if filtered
-                else None,
+                _min_ts(filtered),
+                _max_ts(filtered),
             ],
             "target_language": language_profile.code if language_profile else None,
             "target_language_name": language_profile.name if language_profile else None,
