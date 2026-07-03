@@ -1,6 +1,6 @@
 # Dashboard — Usage & Interpretation Guide
 
-> **Scope note:** this document describes a companion daily-monitoring service that generates the dashboard below. That service is **not included in this repo** — it depends on org-specific scheduling/delivery infrastructure and isn't part of the core `chatintel` package. This doc is kept as a design reference for anyone building their own daily-digest service on top of `chatintel-analyze`'s output (see `docs/PIPELINE.md` File Reference section for the minimal shape to replicate).
+> **Scope note:** this document describes a companion daily-monitoring service that generates the dashboard below. That service is **not included in this repo** — it depends on org-specific scheduling/delivery infrastructure and isn't part of the core `parallax` package. This doc is kept as a design reference for anyone building their own daily-digest service on top of `parallax-analyze`'s output (see `docs/PIPELINE.md` File Reference section for the minimal shape to replicate).
 
 The daily service renders a self-contained HTML dashboard at `dailies/dashboard.html`. No server, no build step — open it in any browser. Everything is embedded.
 
@@ -69,7 +69,7 @@ Key performance indicators for the most recent day of data:
 |--------|-------------------|
 | **Messages** | Total messages today. Compare day-over-day in the activity chart. |
 | **Active users** | Unique posters today. |
-| **Target-language** | Messages flagged as target-language or mixed-language by the configured `LanguageProfile` (see `src/chatintel/core/languages.py`) — script-ratio for CJK/Cyrillic/Arabic/etc., stopword-ratio for Latin-script languages. |
+| **Target-language** | Messages flagged as target-language or mixed-language by the configured `LanguageProfile` (see `src/parallax/core/languages.py`) — script-ratio for CJK/Cyrillic/Arabic/etc., stopword-ratio for Latin-script languages. |
 | **Questions** | Messages ending in question markers or containing question keywords (per the active language profile). |
 | **Friction signals** | Errors, network complaints, timeout, confusion, API key issues, and other problem keywords. |
 

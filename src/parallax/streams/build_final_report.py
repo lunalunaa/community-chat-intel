@@ -211,7 +211,7 @@ All four streams are fed into a stronger/larger model in a single large context 
 - LLM inference: any provider reachable via your LLM CLI's config (or swap in direct API calls)
 - Embeddings: `BAAI/bge-m3` (local, CPU, via `sentence-transformers`)
 - Vector search: `faiss-cpu`
-- Analysis pipeline: this repository's Python package (`chatintel.core.analyze`, `chatintel.streams.*`)
+- Analysis pipeline: this repository's Python package (`parallax.core.analyze`, `parallax.streams.*`)
 
 ### 1.6 Privacy & redaction
 
@@ -317,9 +317,9 @@ Base path: `$OUT_DIR/` (default `./out/`)
 
 ### 5.2 Reproducing this analysis
 
-All scripts are in this repository (`src/chatintel/`):
-- `core/analyze.py` (`chatintel-analyze`) — keyword-stats pipeline (produces report.md)
-- `streams/topics.py` (`chatintel-topics`) — Stream A classifier
+All scripts are in this repository (`src/parallax/`):
+- `core/analyze.py` (`parallax-analyze`) — keyword-stats pipeline (produces report.md)
+- `streams/topics.py` (`parallax-topics`) — Stream A classifier
 - `streams/semantic_retrieval.py` — Stream B embedder + synthesizer
 - `streams/fact_extraction.py` — Stream C fact extractor (tolerant JSON built in)
 - `streams/deterministic_analytics.py` — ground-truth-anchored deterministic analysis
@@ -346,7 +346,7 @@ header = (
 
 **Subject:** {REPORT_SUBJECT}
 **Period analyzed:** {REPORT_PERIOD}
-**Analyst:** community-chat-intel (autonomous multi-stream pipeline)
+**Analyst:** parallax (autonomous multi-stream pipeline)
 **Classification:** {REPORT_CLASSIFICATION}
 
 ---

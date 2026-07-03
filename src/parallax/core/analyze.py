@@ -15,7 +15,7 @@ entirely (every message counts as "target" — useful for already-monolingual
 exports where you don't need the cohort split).
 
 USAGE:
-    chatintel-analyze \\
+    parallax-analyze \\
         --input path/to/export.json \\
         --platform discord \\
         --out ./out/ \\
@@ -56,8 +56,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from chatintel.core import keywords as kw
-from chatintel.core import languages as lang
+from parallax.core import keywords as kw
+from parallax.core import languages as lang
 
 # ----------------------------------------------------------------------------
 # Canonical message schema
@@ -1156,7 +1156,7 @@ def main() -> int:
         type=Path,
         default=Path(__file__).parent.parent / "templates" / "report-template.md",
         help="Report template with {{stats.xxx}} placeholders "
-        "(default: the bundled chatintel/templates/report-template.md)",
+        "(default: the bundled parallax/templates/report-template.md)",
     )
     parser.add_argument(
         "--salt-file",

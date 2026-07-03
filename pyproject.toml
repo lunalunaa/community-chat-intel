@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chatintel"
+name = "parallax"
 version = "0.2.0"
-description = "Privacy-preserving toolkit for turning raw chat exports into structured community-intelligence reports."
+description = "Multi-stream analysis toolkit for turning raw chat exports into structured community-intelligence reports."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -22,12 +22,12 @@ dev = [
 ]
 
 [project.scripts]
-chatintel-analyze = "chatintel.core.analyze:main"
-chatintel-topics = "chatintel.streams.topics:main"
-chatintel-crosstabs = "chatintel.core.crosstabs:main"
+parallax-analyze = "parallax.core.analyze:main"
+parallax-topics = "parallax.streams.topics:main"
+parallax-crosstabs = "parallax.core.crosstabs:main"
 # semantic_retrieval, fact_extraction, deterministic_analytics,
 # narrative_synthesis, build_final_report, and post_analysis are one-shot scripts
-# (module-level code, no main()) — run them with `python -m chatintel.streams.<name>`
+# (module-level code, no main()) — run them with `python -m parallax.streams.<name>`
 # instead of a console script; see README.md's Quick start / docs/PIPELINE.md for
 # exact invocations.
 
@@ -35,4 +35,4 @@ chatintel-crosstabs = "chatintel.core.crosstabs:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-chatintel = ["templates/*.md"]
+parallax = ["templates/*.md"]

@@ -23,7 +23,7 @@ WHY THIS DESIGN:
 
 USAGE:
   # First configure a provider on your chosen CLI once, then:
-  chatintel-topics \\
+  parallax-topics \\
       --users-json ./out/users.json \\
       --input-chat ./discord_export.json \\
       --platform discord \\
@@ -54,8 +54,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from chatintel.core import analyze
-from chatintel.core import languages as lang
+from parallax.core import analyze
+from parallax.core import languages as lang
 
 # ----------------------------------------------------------------------------
 # Topic categories — see plan.md §3.4

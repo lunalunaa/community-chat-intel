@@ -1,11 +1,11 @@
-# community-chat-intel
+# parallax
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/Code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Type checker: basedpyright](https://img.shields.io/badge/Type%20checker-basedpyright-orange.svg)](https://docs.basedpyright.com/)
 [![Package manager: uv](https://img.shields.io/badge/uv-managed-de4c4a.svg)](https://docs.astral.sh/uv/)
-[![CI](https://github.com/lunalunaa/community-chat-intel/actions/workflows/ci.yml/badge.svg)](https://github.com/lunalunaa/community-chat-intel/actions/workflows/ci.yml)
+[![CI](https://github.com/lunalunaa/parallax/actions/workflows/ci.yml/badge.svg)](https://github.com/lunalunaa/parallax/actions/workflows/ci.yml)
 
 Turn raw chat exports (Discord / Telegram / Lark / any JSON) into structured community-intelligence reports — passively, without running a survey. Combines NLP heuristics, local embeddings (BGE-M3 + FAISS), structured LLM fact extraction, deterministic analytics, and multi-model synthesis into one reproducible pipeline. User IDs are SHA-256-hashed by default; no raw quotes leak into outputs.
 
@@ -16,8 +16,8 @@ Multi-language and multi-region out of the box — pick your target market with 
 ## Quick start
 
 ```bash
-git clone https://github.com/lunalunaa/community-chat-intel.git
-cd community-chat-intel
+git clone https://github.com/lunalunaa/parallax.git
+cd parallax
 
 # Install (pick one):
 uv sync --extra dev          # uv (recommended)
@@ -25,13 +25,13 @@ uv sync --extra dev          # uv (recommended)
 python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 
 # Run:
-chatintel-analyze --input ~/Downloads/discord_export.json --platform discord \
+parallax-analyze --input ~/Downloads/discord_export.json --platform discord \
     --target-language ja --region jp --out ./out -v
 
 # Optional: LLM topic tagging + cross-tabulations
-chatintel-topics --input-chat ~/Downloads/discord_export.json --platform discord \
+parallax-topics --input-chat ~/Downloads/discord_export.json --platform discord \
     --target-language ja --out ./out/topics.json
-chatintel-crosstabs --users-json ./out/users.json --region jp --out ./out/crosstabs.json
+parallax-crosstabs --users-json ./out/users.json --region jp --out ./out/crosstabs.json
 ```
 
 > **First install is slow** (~1–2 GB for `sentence-transformers` / `faiss-cpu` / `torch`). This is expected.
@@ -43,10 +43,10 @@ This repo ships a `pyrightconfig.json` pointing at `.venv`. If your editor shows
 
 ```bash
 pip install -e ".[dev]"   # or: uv pip install -e ".[dev]"
-python -m ipykernel install --user --name=chatintel --display-name="chatintel (.venv)"
+python -m ipykernel install --user --name=parallax --display-name="parallax (.venv)"
 ```
 
-Then select **"chatintel (.venv)"** in your editor's kernel/interpreter picker. Verify with `basedpyright .` (should report 0 errors).
+Then select **"parallax (.venv)"** in your editor's kernel/interpreter picker. Verify with `basedpyright .` (should report 0 errors).
 
 </details>
 
@@ -79,12 +79,12 @@ Stream A (`topics.py`) runs first as broad LLM topic classification. See [`docs/
 The remaining stream scripts are one-shot modules (no `main()`):
 
 ```bash
-python -m chatintel.streams.semantic_retrieval
-python -m chatintel.streams.fact_extraction
-python -m chatintel.streams.deterministic_analytics
-python -m chatintel.streams.narrative_synthesis
-python -m chatintel.streams.build_final_report
-python -m chatintel.streams.post_analysis
+python -m parallax.streams.semantic_retrieval
+python -m parallax.streams.fact_extraction
+python -m parallax.streams.deterministic_analytics
+python -m parallax.streams.narrative_synthesis
+python -m parallax.streams.build_final_report
+python -m parallax.streams.post_analysis
 ```
 
 ## Language / region support
@@ -102,7 +102,7 @@ python -m chatintel.streams.post_analysis
 | `es` `fr` `de` `pt` `id` | Latin-script | Stopword-frequency (lower precision) | | |
 | `none` | — | Disables language split | | |
 
-Add your own market by adding one entry to [`src/chatintel/core/languages.py`](src/chatintel/core/languages.py) — no code changes elsewhere.
+Add your own market by adding one entry to [`src/parallax/core/languages.py`](src/parallax/core/languages.py) — no code changes elsewhere.
 
 ## Configuration
 
@@ -125,14 +125,14 @@ See [`docs/PIPELINE.md`](docs/PIPELINE.md) for the full list and usage.
 ## Project structure
 
 ```
-src/chatintel/
+src/parallax/
 ├── core/
-│   ├── analyze.py               # main pipeline (chatintel-analyze)
+│   ├── analyze.py               # main pipeline (parallax-analyze)
 │   ├── languages.py             # language/region profile registry
 │   ├── keywords.py              # keyword dictionaries — tune for your product
-│   └── crosstabs.py             # cross-tabulation helper (chatintel-crosstabs)
+│   └── crosstabs.py             # cross-tabulation helper (parallax-crosstabs)
 ├── streams/
-│   ├── topics.py                # Stream A: LLM topic-tagging (chatintel-topics)
+│   ├── topics.py                # Stream A: LLM topic-tagging (parallax-topics)
 │   ├── semantic_retrieval.py    # Stream B: embeddings + FAISS semantic search
 │   ├── fact_extraction.py          # Stream C: structured LLM fact extraction (tolerant JSON)
 │   ├── deterministic_analytics.py # Stream D: ground-truth-anchored analytics
@@ -148,7 +148,7 @@ src/chatintel/
 - **Discord** — [DiscordChatExporter](https://github.com/Tyrrrz/DiscordChatExporter)
 - **Telegram** — Telegram Desktop → group → Export chat history → JSON
 - **Lark/Feishu** — [@larksuite/cli](https://github.com/larksuite/cli)
-- **Anything else** — match the canonical schema (`chatintel-analyze --help`) and use `--platform canonical`
+- **Anything else** — match the canonical schema (`parallax-analyze --help`) and use `--platform canonical`
 
 ## Privacy
 

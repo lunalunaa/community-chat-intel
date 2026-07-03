@@ -50,9 +50,9 @@ jobs:
             - run: uv pip install -e .
             - name: Verify console scripts
               run: |
-                  uv run chatintel-analyze --help | head -1
-                  uv run chatintel-topics --help | head -1
-                  uv run chatintel-crosstabs --help | head -1
+                  uv run parallax-analyze --help | head -1
+                  uv run parallax-topics --help | head -1
+                  uv run parallax-crosstabs --help | head -1
             - name: Smoke-test pipeline on synthetic data
               working-directory: ${{ github.workspace }}
               run: |
@@ -75,9 +75,9 @@ jobs:
                   }
                   json.dump(export, open('/tmp/ci-smoke/export.json', 'w'), ensure_ascii=False)
                   "
-                  uv run chatintel-analyze --input /tmp/ci-smoke/export.json --platform discord --out /tmp/ci-smoke/out -v
-                  uv run chatintel-crosstabs --users-json /tmp/ci-smoke/out/users.json --out /tmp/ci-smoke/out/crosstabs.json
-                  uv run chatintel-topics --input-chat /tmp/ci-smoke/export.json --platform discord --dry-run \
+                  uv run parallax-analyze --input /tmp/ci-smoke/export.json --platform discord --out /tmp/ci-smoke/out -v
+                  uv run parallax-crosstabs --users-json /tmp/ci-smoke/out/users.json --out /tmp/ci-smoke/out/crosstabs.json
+                  uv run parallax-topics --input-chat /tmp/ci-smoke/export.json --platform discord --dry-run \
                       --out /tmp/ci-smoke/out/topics.json --stats-path /tmp/ci-smoke/out/stats.json
                   test -f /tmp/ci-smoke/out/report.md
                   test -f /tmp/ci-smoke/out/stats.json
