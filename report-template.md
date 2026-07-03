@@ -1,6 +1,6 @@
-# Nous Chinese Community — Chat-History Analysis Findings
+# Community Chat-History Analysis Findings
 
-> **Template instructions:** `analyze.py` populates the `\{{stats.foo.bar}}` placeholders automatically. After the pipeline runs, fill the `NARRATIVE:` prose sections manually based on what the numbers show. Keep the structure intact so v1/v2 reports are directly comparable. Never paste raw user IDs, usernames, or direct message quotes — use `excerpts.md` for (paraphrased, redacted) illustrative examples.
+> **Template instructions:** `analyze.py` populates the `\{{stats.foo.bar}}` placeholders automatically. After the pipeline runs, fill the `NARRATIVE:` prose sections manually based on what the numbers show. Keep the structure intact so successive report versions are directly comparable. Never paste raw user IDs, usernames, or direct message quotes — use `excerpts.md` for (paraphrased, redacted) illustrative examples.
 
 **Period analyzed:** {{stats.metadata.date_range.0}} → {{stats.metadata.date_range.1}}
 **Platform:** {{stats.metadata.channels}}
@@ -15,7 +15,7 @@ NARRATIVE: Write 4-6 bullets capturing the most decision-relevant findings. Answ
 - How big is the Chinese-speaking cohort relative to the overall community?
 - Is it growing, stable, or shrinking?
 - What's the single loudest product pain point?
-- Which Chinese providers dominate, and is the Hermes Agent UX aligned with that?
+- Which Chinese providers dominate, and is your product's UX aligned with that?
 - Are impersonator sites a real issue in this data?
 - What, if anything, does this tell us about Feishu / WeChat / other IM platform demand?
 
@@ -54,7 +54,7 @@ Most Chinese-speaking users post in these UTC clusters (used as a timezone proxy
 - `eu_evening` — modal post hour 18–22 UTC = evening 20–24 CET → likely Europe
 - `other` — unclear / daytime / mixed
 
-NARRATIVE: Does the Chinese cohort skew mainland or diaspora? This determines whether mainland-specific moves (ModelScope mirror, Kimi-CN UX, WeChat OA, ICP-filed docs site) are load-bearing or whether Lark-international / Western-hosted services are sufficient.
+NARRATIVE: Does the Chinese cohort skew mainland or diaspora? This determines whether mainland-specific moves (a domestic model mirror, a China-market provider UX, WeChat Official Account presence, ICP-filed docs site) are load-bearing or whether international-hosted services are sufficient.
 
 ---
 
@@ -79,25 +79,25 @@ Raw mention counts across all Chinese/mixed messages:
 {{stats.providers}}
 ```
 
-NARRATIVE: Rank by mention share. Which Chinese-made providers (DeepSeek, Kimi, GLM, Qwen, Volcengine, MiniMax, Doubao) dominate vs Western (Anthropic, OpenAI, Gemini, OpenRouter)? Is there a clear mainland/diaspora split — do mainland-evening users mention Chinese providers more? Compare to Hermes Agent's supported-providers list:
-- Are users naming providers Hermes supports? → good, provider UX is the lever
-- Are they naming providers Hermes does NOT support? → gap in provider coverage
-- Is Volcengine Ark mentioned at all? → signal on awareness of the official Volcengine Hermes Agent integration
+NARRATIVE: Rank by mention share. Which Chinese-made providers (DeepSeek, Kimi, GLM, Qwen, Volcengine, MiniMax, Doubao) dominate vs Western (Anthropic, OpenAI, Gemini, OpenRouter)? Is there a clear mainland/diaspora split — do mainland-evening users mention Chinese providers more? Compare to your product's supported-providers list:
+- Are users naming providers you already support? → good, provider UX is the lever
+- Are they naming providers you do NOT support? → gap in provider coverage
+- Is a specific Chinese provider mentioned at all? → signal on awareness of that provider's integration (if you have one)
 
 ---
 
-## 5. OpenClaw / Claw ecosystem mentions
+## 5. Competitor mentions
 
-Organic mentions of Claw products in Chinese-speaker conversations:
+Organic mentions of competitor products in Chinese-speaker conversations:
 
 ```
-{{stats.claws}}
+{{stats.competitors}}
 ```
 
-NARRATIVE: Which Claws surface organically? Interpretation guide:
-- Heavy mentions of ArkClaw / WorkBuddy / Kimi Claw → Chinese users think of Hermes Agent next to these as alternatives or comparison points. Not inherently a loss signal — depends on sentiment (see excerpts.md).
-- Mentions of LobsterAI / CountBot / AutoClaw → these are the open-source-leaning Claws philosophically closest to Hermes Agent. Organic mentions here indicate users are actively evaluating Hermes against them.
-- No Claw mentions → the Claw ecosystem isn't on this audience's mental map despite industry-wide hype. Useful to know; means Hermes Agent isn't being framed as a Claw-alternative in this community.
+NARRATIVE: Which competitors surface organically? Interpretation guide:
+- Heavy mentions of specific named competitors → Chinese users think of your product next to these as alternatives or comparison points. Not inherently a loss signal — depends on sentiment (see excerpts.md).
+- Mentions of competitors philosophically closest to your own product → organic mentions here indicate users are actively evaluating you against them.
+- No competitor mentions → the competitive landscape isn't on this audience's mental map despite industry-wide hype. Useful to know; means you aren't being framed as "yet another alternative" in this community.
 
 ---
 
@@ -109,11 +109,11 @@ Organic mentions of IM platforms in Chinese-speaker conversations:
 {{stats.messaging_platforms}}
 ```
 
-NARRATIVE: This is the most important single input to the Feishu decision — what do Chinese Hermes users actually talk about when messaging platforms come up? Rank order matters more than absolute count. Interpretation guide:
-- Feishu/飞书 dominates → confirms the original hypothesis; Feishu adapter (or the Volcengine-Ark-via-Feishu path) has demand.
+NARRATIVE: This is the most important single input to any "which IM platform should we integrate first" decision — what do Chinese users actually talk about when messaging platforms come up? Rank order matters more than absolute count. Interpretation guide:
+- Feishu/飞书 dominates → a Feishu adapter has organic demand.
 - WeChat/微信 or WeCom/企业微信 dominates → pivot: the priority adapter is WeChat, not Feishu.
-- DingTalk/钉钉 competitive → consider DingTalk adapter alongside or instead of Feishu.
-- None of them mentioned significantly → Chinese users aren't blocked on IM integration; re-prioritize to model-provider UX and ModelScope.
+- DingTalk/钉钉 competitive → consider a DingTalk adapter alongside or instead of Feishu.
+- None of them mentioned significantly → Chinese users aren't blocked on IM integration; re-prioritize elsewhere.
 
 Cross-check with the "want to use vs using now" sentiment in excerpts.md.
 
@@ -128,8 +128,8 @@ Raw counts of friction-related keywords in Chinese-speaker messages:
 ```
 
 NARRATIVE: Rank the friction types. Typical patterns:
-- `vpn_blocked` heavy → network-access friction is P1; ModelScope mirror + Chinese provider default routing become urgent.
-- `error_generic` / `key_issue` / `oauth_issue` heavy → config UX problem; Chinese-provider setup wizard + Chinese-language error messages are high-ROI.
+- `vpn_blocked` heavy → network-access friction is P1; a domestic mirror + Chinese-provider default routing become urgent.
+- `error_generic` / `key_issue` / `oauth_issue` heavy → config UX problem; a Chinese-provider setup wizard + Chinese-language error messages are high-ROI.
 - `confused` / `help_request` heavy → docs are failing; Chinese-language docs or LLM-translated docs become P1.
 - `broken` / `failed` with specific product context → bug triage priority.
 
@@ -145,17 +145,17 @@ Mentions of deploy/install paths in Chinese-speaker messages:
 {{stats.install_paths}}
 ```
 
-NARRATIVE: What install surfaces are Chinese users on? If WSL heavy → Windows-native documentation investment is warranted. If Docker heavy → containerized-deploy story matters. If Nous Portal heavy → hosted experience is winning; self-install friction is a smaller issue than it seems.
+NARRATIVE: What install surfaces are Chinese users on? If WSL heavy → Windows-native documentation investment is warranted. If Docker heavy → containerized-deploy story matters. If a hosted-service option is heavily used → hosted experience is winning; self-install friction is a smaller issue than it seems.
 
 ---
 
-## 9. Hermes Agent feature usage (depth signal)
+## 9. Feature usage (depth signal)
 
 ```
 {{stats.features}}
 ```
 
-NARRATIVE: Are Chinese users engaging with Hermes Agent's differentiators (skills, memory, cron, subagents, MCP) or using it as a chat UI? High mentions of skills/memory/cron → community content should showcase advanced workflows. Low mentions → marketing and docs should lead with differentiators; users aren't discovering the value. Cross-tab with friction: if `skills` is mentioned but so is `confused` → skills system has UX friction even for users who know about it.
+NARRATIVE: Are Chinese users engaging with your product's differentiator features, or using it as a thin chat UI? High mentions of differentiator features → community content should showcase advanced workflows. Low mentions → marketing and docs should lead with differentiators; users aren't discovering the value. Cross-tab with friction: if a differentiator feature is mentioned but so is `confused` → that feature has UX friction even for users who know about it.
 
 ---
 
@@ -171,7 +171,7 @@ Total tagged: {{stats.topics.total_tagged}}
 
 NARRATIVE: Topic distribution tells you what the Chinese cohort is *actually talking about* once you sum across keyword hits. Typical interpretation:
 - Heavy `provider_config` + `install_help` → onboarding UX is the primary support burden; docs and provider-config UX fixes are high-ROI
-- Heavy `messaging_adapter` → users are actively trying to wire Hermes into their IM platforms; adapter completeness matters
+- Heavy `messaging_adapter` → users are actively trying to wire your product into their IM platforms; adapter completeness matters
 - Heavy `bug_report` → a stable-release quality problem
 - Heavy `feature_request` → indicates product pull but unmet demand
 - Heavy `general_discussion` → healthy community but no strong signal
@@ -189,7 +189,7 @@ Impersonator domain mentions (both as URLs and bare-text references):
 {{stats.urls.impersonator_domains}}
 ```
 
-Official Nous domain mentions:
+Official domain mentions:
 
 ```
 {{stats.urls.official_domains}}
@@ -207,22 +207,22 @@ Top 50 domains mentioned overall:
 {{stats.urls.top_domains}}
 ```
 
-NARRATIVE: Compare `impersonator_domains` vs `official_domains` mention counts. If impersonator mentions are non-trivial (>5% of Chinese-domain mentions), brand-protection priority escalates. If impersonator mentions are *in* question contexts ("is X official?"), users are uncertain — publishing a canonical "official Nous Chinese presence" statement is cheap and high-value. If impersonator mentions are in *recommendation* contexts ("I followed this guide from X"), impersonator sites are actively serving as our documentation — risk is much higher. Excerpts in `excerpts.md` should disambiguate this.
+NARRATIVE: Compare `impersonator_domains` vs `official_domains` mention counts. If impersonator mentions are non-trivial (>5% of Chinese-domain mentions), brand-protection priority escalates. If impersonator mentions are *in* question contexts ("is X official?"), users are uncertain — publishing a canonical "official Chinese-language presence" statement is cheap and high-value. If impersonator mentions are in *recommendation* contexts ("I followed this guide from X"), impersonator sites are actively serving as your documentation — risk is much higher. Excerpts in `excerpts.md` should disambiguate this.
 
 ---
 
 ## 11. Shadow community mentions
 
-Where Chinese users say they hang out outside the Nous Discord:
+Where Chinese users say they hang out outside this chat:
 
 ```
 {{stats.shadow_community_mentions}}
 ```
 
 NARRATIVE: Which external communities surface? Typical pattern for Chinese AI communities:
-- WeChat groups / OAs → the actual center of gravity. If mentioned frequently, these are where Chinese community engagement strategy should focus.
-- Zhihu → where technical long-form discussion happens. High mentions → Zhihu organizational account is high-ROI content investment.
-- Bilibili → where tutorial / walkthrough content lives. High mentions → Bilibili channel is the video-content play.
+- WeChat groups / Official Accounts → often the actual center of gravity. If mentioned frequently, these are where Chinese community engagement strategy should focus.
+- Zhihu → where technical long-form discussion happens. High mentions → a Zhihu organizational account is high-ROI content investment.
+- Bilibili → where tutorial / walkthrough content lives. High mentions → a Bilibili channel is the video-content play.
 - Xiaohongshu → younger/creator audience. Lower priority for developer-tool content usually.
 
 ---
@@ -238,14 +238,14 @@ NARRATIVE: Which external communities surface? Typical pattern for Chinese AI co
 
 NARRATIVE: The answered-rate is a direct community-health signal. If <70%, Chinese users are being under-served by the existing help system. If <50%, Chinese questions are effectively getting ignored and users will leave for communities that help them. Interpretation guide:
 - Low rate + heavy `help_request` / `confused` friction → need a Chinese-speaking mod or LLM-based auto-responder; at minimum, a pinned Chinese FAQ.
-- Low rate + specific topic clusters unanswered (e.g., Feishu setup, Kimi-CN config) → targeted docs fix those specific cases.
+- Low rate + specific topic clusters unanswered (e.g., a specific adapter setup, a specific provider config) → targeted docs fix those specific cases.
 - High rate → the existing volunteer ecosystem is working; focus resources elsewhere.
 
 ---
 
 ## 13. Acquisition-channel markers
 
-Organic mentions of how users found Hermes Agent:
+Organic mentions of how users found your product:
 
 ```
 {{stats.acquisition_markers}}
@@ -255,14 +255,14 @@ NARRATIVE: These are noisy signals from messages like "I saw it on [X]" or "foun
 
 ---
 
-## 14. Cross-tabulations (manual pass)
+## 14. Cross-tabulations (see `crosstabs.py`)
 
-NARRATIVE: Fill these in by querying users.json directly or by extending the pipeline. The highest-value cross-tabs:
+NARRATIVE: Fill these in from `crosstabs.json` / `crosstabs.md`, or extend the pipeline. The highest-value cross-tabs:
 
 1. **Provider × Location proxy** — are mainland users more likely to mention Chinese providers than overseas users?
 2. **Messaging platform × Retention** — do users who mention Feishu/WeChat stick around longer? (Selection bias hazard; interpret carefully.)
 3. **Impersonator mention × Friction** — do users who referenced impersonator sites report more confusion?
-4. **Feature usage × Retention** — do users who mention skills/memory/cron retain better? (The "are differentiators sticky" question.)
+4. **Feature usage × Retention** — do users who mention your differentiator features retain better? (The "are differentiators sticky" question.)
 5. **Install path × Friction** — do WSL users hit more friction than Linux-native?
 
 ---
@@ -276,18 +276,18 @@ NARRATIVE: After reading §1–§14, write 3–6 concrete recommendations in thi
 - **P2 (next quarter):** ____________
 - **Explicitly NOT recommended:** ____________
 
-Tie each recommendation back to at least one numerical finding above, so reviewers can audit the reasoning. Ground them in the strategic memo's P0-P5 framework (see `~/nous-chinese-strategic-memo.md`).
+Tie each recommendation back to at least one numerical finding above, so reviewers can audit the reasoning.
 
 ---
 
 ## 16. Known limitations
 
-See `~/nous-chinese-analysis/plan.md` §7 for full list. Most important for this specific run:
+See `plan.md` §7 for full list. Most important for this specific run:
 
 - Self-selection: only users who joined this chat and posted are counted. Lurkers and non-joiners are invisible.
 - Language classification is heuristic; heavy code-switching may be misclassified. Reviewed samples indicate ~{{NARRATIVE: describe spot-check accuracy, e.g., "~90% accurate on a 50-message sample"}}.
 - Impersonator-domain mention context is not auto-classified. See excerpts.md for disambiguation.
-- Lapsed users are observationally equivalent to retained-but-quiet users — "stopped using Hermes" is not directly recoverable.
+- Lapsed users are observationally equivalent to retained-but-quiet users — "stopped using the product" is not directly recoverable.
 - No LLM topic-tagging pass was run. Rerun with topic tagging for a richer §9.
 
 ---

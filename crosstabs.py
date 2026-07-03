@@ -1,20 +1,20 @@
-"""Cross-tabulation helper for the Nous Chinese chat-history analysis pipeline.
+"""Cross-tabulation helper for the community chat-history analysis pipeline.
 
-Loads `users.json` (produced by analyze.py) and computes the pivots §14 of the
-report template lists as decision-relevant:
+Loads `users.json` (produced by analyze.py) and computes decision-relevant
+pivots:
 
   1. Provider cluster × Location proxy
      → Do mainland users lean on Chinese providers more than overseas?
   2. Messaging platform × Location
-     → Does Feishu demand concentrate in mainland / overseas / both?
+     → Does a given IM-platform's demand concentrate in mainland / overseas / both?
   3. Feature depth × Retention
-     → Do users who engage with skills/memory/cron retain better?
+     → Do users who engage with your product's differentiator features retain better?
   4. Install path × Friction
-     → Does WSL hit more friction than Linux-native / Docker?
+     → Does one install path (e.g. WSL) hit more friction than another?
   5. Impersonator mentions × Friction
-     → Are users who referenced `.cn` impersonator sites more confused?
-  6. Claw usage × Retention
-     → Do users who've tried competing Claws lapse faster?
+     → Are users who referenced impersonator/clone sites more confused?
+  6. Competitor usage × Retention
+     → Do users who've tried competing products lapse faster?
   7. Acquisition channel × Retention
      → Which acquisition channels produce sticky users?
 
@@ -41,26 +41,22 @@ from typing import Any
 # Category definitions — how we collapse per-user counters into pivot axes
 # ----------------------------------------------------------------------------
 
-# Provider clusters — aggregate the ~30 provider labels into 4 strategic buckets
+# Provider clusters — aggregate the provider labels into strategic buckets
 PROVIDER_CLUSTERS = {
     "chinese_api": {
         "deepseek",
         "kimi_moonshot",
-        "kimi_cn",
         "qwen_alibaba",
         "glm_zhipu",
         "minimax",
-        "minimax_cn",
         "volcengine_ark",
         "doubao",
-        "xiaomi_mimo",
         "baichuan",
         "yi_01ai",
     },
     "western_api": {"anthropic_claude", "openai", "gemini_google"},
     "aggregator_or_portal": {"openrouter", "huggingface", "modelscope"},
     "self_hosted": {"ollama", "vllm", "llamacpp", "lmstudio"},
-    # nous_hermes is excluded — it's the product every user talks about
 }
 
 # Messaging platform — collapse to 4 buckets
@@ -71,7 +67,9 @@ MESSAGING_BUCKETS = {
     "western_im": {"discord", "telegram", "slack", "signal", "matrix", "whatsapp"},
 }
 
-# Deep / differentiator features (vs basic chat use)
+# Deep / differentiator features (vs basic chat use) — EXAMPLE set, matches
+# the placeholder labels in keywords.py's PRODUCT_FEATURES. Replace with
+# your own product's differentiator feature labels.
 DEEP_FEATURES = {"skills", "memory", "cron", "delegate", "mcp", "browser", "vision"}
 
 # Install path buckets
@@ -79,7 +77,7 @@ INSTALL_BUCKETS = {
     "wsl": {"wsl"},
     "native_unix": {"linux_native", "macos"},
     "docker": {"docker"},
-    "portal_hosted": {"nous_portal"},
+    "hosted": {"hosted_service"},
     "vps_ssh": {"vps_ssh"},
     # windows_native, uv_python, pip_python are too generic / cross-cutting
 }
@@ -202,12 +200,10 @@ def user_has_impersonator(u: dict) -> str:
     )
 
 
-def user_has_claw(u: dict) -> str:
-    """Has this user mentioned any Claw product other than OpenClaw-upstream / the 龙虾 meme?"""
-    claws = nonzero(u.get("claws", {}))
-    # Exclude the upstream framework + meme term — we want product mentions
-    product_claws = claws - {"openclaw_upstream", "claw_meme"}
-    return "yes" if product_claws else "no"
+def user_has_competitor(u: dict) -> str:
+    """Has this user mentioned any competitor product?"""
+    competitors = nonzero(u.get("competitors", {}))
+    return "yes" if competitors else "no"
 
 
 # ----------------------------------------------------------------------------
@@ -358,8 +354,8 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             t,
             interpretation=(
                 "If `chinese_api` is concentrated in `mainland_evening`, "
-                "mainland Hermes users rely on Chinese providers — "
-                "strengthens the case for `kimi-coding-cn` / DeepSeek / Volcengine UX investment. "
+                "mainland users rely on Chinese providers — "
+                "strengthens the case for investing in that provider's UX. "
                 "If `western_api` dominates `na_evening` / `eu_evening`, overseas Chinese diaspora "
                 "still works via Anthropic/OpenAI and doesn't need mainland-specific provider UX."
             ),
@@ -376,9 +372,9 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             t,
             interpretation=(
                 "Which IM platform does each geography actually care about? "
-                "`feishu_lark` concentrated in `mainland_evening` → Feishu adapter priority "
-                "is mainland-driven. `wechat_family` dominating → pivot away from Feishu. "
-                "`dingtalk` non-trivial → enterprise-adjacent mainland users; consider DingTalk adapter."
+                "`feishu_lark` concentrated in `mainland_evening` → a Feishu-adapter "
+                "investment is mainland-driven. `wechat_family` dominating → pivot toward WeChat instead. "
+                "`dingtalk` non-trivial → enterprise-adjacent mainland users; consider a DingTalk adapter."
             ),
             note="Multi-row: a user mentioning both Feishu and WeChat counts in both rows.",
         )
@@ -392,9 +388,9 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             "3. Feature depth × Retention",
             t,
             interpretation=(
-                "Do users who engage with skills/memory/cron retain better? "
+                "Do users who engage with your product's differentiator features retain better? "
                 "If `deep_features` shows higher `active_30d` share than `chat_only`, "
-                "Hermes's differentiators ARE sticky — lead marketing and docs with them. "
+                "your differentiators ARE sticky — lead marketing and docs with them. "
                 "If not, the differentiators aren't landing; simplify onboarding first."
             ),
         )
@@ -410,8 +406,8 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             interpretation=(
                 "Which install paths produce the most pain? If `wsl` has a higher "
                 "`high_3plus` share than `native_unix`, invest in a Windows-native "
-                "or better-documented WSL2 install flow. If `portal_hosted` has near-zero "
-                "friction, push more users toward Portal as the on-ramp."
+                "or better-documented WSL2 install flow. If `hosted` has near-zero "
+                "friction, push more users toward the hosted on-ramp."
             ),
             note="Multi-row: users mentioning multiple install paths count in each.",
         )
@@ -425,7 +421,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             "5. Impersonator mentions × Friction",
             t,
             interpretation=(
-                "Do users who referenced a `.cn` impersonator site report MORE friction? "
+                "Do users who referenced an impersonator/clone site report MORE friction? "
                 "If yes → the impersonator docs are actively misleading users and driving "
                 "support burden. Brand-protection priority escalates. "
                 "If no → mentions are casual / curious, not load-bearing."
@@ -433,18 +429,18 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
         )
     )
 
-    # --- 6. Claw usage × Retention ----------------------------------------
-    t = pivot(zh_users, user_has_claw, lambda u: user_retention(u, now))
-    crosstabs["claw_x_retention"] = t
+    # --- 6. Competitor usage × Retention -----------------------------------
+    t = pivot(zh_users, user_has_competitor, lambda u: user_retention(u, now))
+    crosstabs["competitor_x_retention"] = t
     md_sections.append(
         format_table_md(
-            "6. Claw usage × Retention",
+            "6. Competitor usage × Retention",
             t,
             interpretation=(
-                "Do users who've tried a Claw product lapse faster, or do they use "
-                "Hermes alongside? Higher `lapsed_90d_plus` for `yes` → users are "
-                "migrating away to Claws. Higher `active_30d` for `yes` → Chinese users "
-                "dual-wield; Hermes isn't losing to Claws, it's complementary."
+                "Do users who've tried a competing product lapse faster, or do they use "
+                "your product alongside it? Higher `lapsed_90d_plus` for `yes` → users are "
+                "migrating away to competitors. Higher `active_30d` for `yes` → users "
+                "dual-wield; you aren't losing to competitors, you're complementary."
             ),
         )
     )
@@ -464,7 +460,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
             interpretation=(
                 "Which acquisition sources produce sticky Chinese users? "
                 "Higher `active_30d` share for `tech_community` vs `content` → "
-                "invest in GitHub / HN / HF model-card presence over Zhihu articles. "
+                "invest in GitHub / HN / HF model-card presence over long-form articles. "
                 "Higher `active_30d` for `word_of_mouth` → community referral is the strongest driver; "
                 "invest in community-lead relationships, not broad-reach content."
             ),
@@ -485,7 +481,7 @@ def build_crosstabs(users: list[dict], now: datetime) -> tuple[dict[str, Any], s
 
 def main() -> int:
     p = argparse.ArgumentParser(
-        description="Cross-tabulation helper for Nous Chinese chat analysis."
+        description="Cross-tabulation helper for community chat analysis."
     )
     p.add_argument(
         "--users-json",

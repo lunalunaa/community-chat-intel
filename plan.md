@@ -1,12 +1,12 @@
 # Chinese User Chat-History Analysis Plan
 
-**Purpose:** Extract the same research signals the poll would have produced — message counts, topics, official-vs-shadow-platform usage, Feishu demand — from existing chat history rather than by actively polling users. Zero endorsement signal to any platform, zero sample-selection bias from who chooses to respond.
+**Purpose:** Extract the same research signals a user poll would have produced — message counts, topics, official-vs-shadow-platform usage, messaging-adapter demand — from existing chat history rather than by actively polling users. Zero endorsement signal to any platform, zero sample-selection bias from who chooses to respond.
 
-**Companion documents:**
-- `~/nous-chinese-strategic-memo.md` — the strategic framing this analysis feeds into
-- `~/nous-chinese-community-poll.md` — the poll instrument we are *not* running but whose question structure we're mirroring in the analysis
-- `~/nous-chinese-analysis/analyze.py` — the Python pipeline implementing this plan
-- `~/nous-chinese-analysis/report-template.md` — skeleton of the final findings report
+**Companion documents (repo-internal):**
+- `README.md` — quick-start and file overview
+- `analyze.py` — the Python pipeline implementing this plan
+- `report-template.md` — skeleton of the final findings report
+- `docs/PIPELINE.md` — the deeper 4-stream analysis architecture
 
 ---
 
@@ -16,14 +16,14 @@
 |---|---|---|
 | Q1 Location | Cannot recover directly. Timezone-of-posting proxy. | Hour-of-day histogram per Chinese-primary user → mainland (UTC+8) vs overseas clusters |
 | Q2 Acquisition channel | Messages containing "I saw" / "我看到" / "从..了解到" + URL references in first-N messages per user | Keyword + URL extraction, first-week-of-activity filter |
-| Q3 Brand audit (`.cn` sites) | Direct mentions of `hermes-agent.org.cn`, `hermesagentai.cn`, `hermesagent.org.cn`, `toolin.ai` | Regex URL extraction + domain classification |
+| Q3 Brand audit (impersonator sites) | Direct mentions of your product's known impersonator/clone domains (configure in `keywords.py`) | Regex URL extraction + domain classification |
 | Q4 Install path | Messages about WSL2 / Linux / Docker / macOS / Windows install | Keyword cluster |
 | Q5 Install friction | Error messages, help requests, "怎么装" / "安装失败" / "how do I install" | Error-keyword filter + help-request topic cluster |
 | Q6 Model provider | Organic mentions of DeepSeek / Kimi / Qwen / GLM / Volcengine / Anthropic etc. | Provider-keyword frequency per user, weighted by "I use X" vs "X is bad" context |
 | Q7 Messaging adapters | Mentions of Feishu / WeChat / WeCom / DingTalk / Telegram in feature-request or usage context | Platform-keyword filter + sentiment analysis |
-| Q7b Claw products | Organic mentions of ArkClaw / WorkBuddy / Kimi Claw / LobsterAI / CountBot / 龙虾 | Claw-keyword filter |
+| Q7b Competitor products | Organic mentions of named competitors (configure in `keywords.py`'s `COMPETITORS`) | Competitor-keyword filter |
 | Q8 Help channels | Questions asked vs answered in the chat itself | Unanswered-question detection (no reply within N messages / N hours) |
-| Q9 Feature usage | Mentions of skills / memory / cron / subagents / messaging / browser / vision | Feature-keyword frequency |
+| Q9 Feature usage | Mentions of your product's differentiator features | Feature-keyword frequency |
 | Q10 Usage intensity | Messages per user over time; "stopped using" = last-seen timestamp | Per-user time-series |
 | Q11 Preferred official Chinese channels | Cannot recover. Indirect: mentions of WeChat OA / Zhihu / Bilibili / ModelScope | Keyword frequency + context |
 | Q12 Ongoing friction | Complaints, error reports, "问题/问不到/解决不了/没办法" | Complaint-keyword filter |
@@ -42,7 +42,7 @@
 1. **Attitudes / preferences** the user didn't spontaneously express
 2. **Reasons users stopped using** (they just go silent)
 3. **Ranked preferences between alternatives** never mentioned together
-4. **Acquisition channels** for users who never talked about how they found Hermes
+4. **Acquisition channels** for users who never talked about how they found the product
 
 **This is an acceptable tradeoff** given that the poll carries an endorsement signal we don't want to send.
 
@@ -156,15 +156,15 @@ OUTPUT: JSON stat bundle + report.md with placeholders filled
 
 Stored in `keywords.py`; loaded by `analyze.py`. Categories:
 
-1. **Providers** — DeepSeek, Kimi / 月之暗面, Qwen / 通义, GLM / 智谱, MiniMax, Volcengine / 火山 / 方舟, Doubao / 豆包, Anthropic / Claude, OpenAI / ChatGPT, Gemini / Google, Hermes / Nous, OpenRouter, HuggingFace, ModelScope / 魔搭, Ollama, vLLM, etc.
-2. **Claws** — OpenClaw, 龙虾, ArkClaw, WorkBuddy, QClaw, AutoClaw, Kimi Claw, MaxClaw, CoPaw, LobsterAI, CountBot, DuClaw, 钉钉悟空, QoderWork, MiClaw, StepClaw, 扣子 / Coze, 百虾大战
+1. **Providers** — DeepSeek, Kimi / 月之暗面, Qwen / 通义, GLM / 智谱, MiniMax, Volcengine / 火山 / 方舟, Doubao / 豆包, Anthropic / Claude, OpenAI / ChatGPT, Gemini / Google, OpenRouter, HuggingFace, ModelScope / 魔搭, Ollama, vLLM, etc.
+2. **Competitors** — your market's named competitor products and their slang/nicknames (EXAMPLE placeholders in `keywords.py`; replace with real ones)
 3. **Messaging platforms** — Feishu / 飞书 / Lark, WeChat / 微信, WeCom / 企业微信, DingTalk / 钉钉, QQ, Discord, Telegram, Slack, Signal, Matrix, Email / 邮件, SMS
-4. **Hermes features** — skills / 技能, memory / 记忆, cron / 定时任务, delegate / 子任务 / 委派, browser / 浏览器, vision / 视觉, TTS / 语音, MCP, execute_code
+4. **Product features** — your product's differentiator feature names (EXAMPLE placeholders in `keywords.py`: skills / 技能, memory / 记忆, cron / 定时任务, delegate / 子任务 / 委派, browser / 浏览器, vision / 视觉, TTS / 语音, MCP, execute_code)
 5. **Install paths** — WSL / WSL2, Docker, Linux, macOS, Windows, pip, uv, apt, brew, 安装
 6. **Friction signals** — error, traceback, 报错, 超时, 翻墙, VPN, 失败, 卡住, 问题, 不能, 怎么办, help, fix, broken, slow
-7. **Impersonator domains** — `hermes-agent.org.cn`, `hermesagentai.cn`, `hermesagent.org.cn`, `toolin.ai/blog/hermes-agent`
+7. **Impersonator domains** — your product's known impersonator/clone domains (EXAMPLE placeholders in `keywords.py`; replace with real ones)
 8. **Shadow-community markers** — 微信群, QQ群, 飞书群, 公众号, 知乎, B站 / 哔哩哔哩, 小红书, 掘金, 博客园 / CSDN / 思否
-9. **Chinese-providers-by-region split markers** — 中国版, 国内版, 国际版, `kimi-coding-cn`, `minimax-cn`, `.cn` domain TLD
+9. **Chinese-providers-by-region split markers** — 中国版, 国内版, 国际版, `.cn` domain TLD
 
 Each keyword has:
 - Canonical label (for deduplication)
@@ -179,12 +179,12 @@ Small, stable set to keep tagging consistent:
 - `install_report` — reporting an install issue or fix
 - `provider_config` — model provider setup or API key questions
 - `messaging_adapter` — IM platform integration questions
-- `feature_usage` — using skills / memory / cron / subagents
+- `feature_usage` — using your product's differentiator features
 - `model_discussion` — which model is best / benchmarks / comparisons
 - `community_meta` — announcements, meetups, links to external content
 - `brand_identity` — "is [X site] official?" / authenticity questions
 - `bug_report` — reproducible technical issue
-- `feature_request` — "I wish Hermes could..."
+- `feature_request` — "I wish this product could..."
 - `success_story` — showing off something they built
 - `general_discussion` — catch-all
 
@@ -192,11 +192,11 @@ Each message tagged with 1 primary + optional 1 secondary category.
 
 ### 3.5 LLM selection for topic tagging
 
-- **First pass:** free/cheap model (DeepSeek API, or Hermes Agent itself dogfooding) — batch prompts of 50 messages each, request JSON output
+- **First pass:** free/cheap model (a low-cost provider, or your own product dogfooding itself if it's an AI-agent tool) — batch prompts of 50 messages each, request JSON output
 - **Validation:** sample 100 tagged messages, hand-check, compute precision/recall
 - **Fallback:** unsupervised BERTopic clustering if LLM tagging is too noisy or expensive
 
-Cost estimate: at ~20K Chinese messages, ~¥50-200 on DeepSeek API for a full pass. Trivial.
+Cost estimate: at ~20K Chinese messages, a few dollars on a cheap Chinese-market provider for a full pass. Trivial.
 
 ---
 
@@ -288,9 +288,9 @@ Cost estimate: at ~20K Chinese messages, ~¥50-200 on DeepSeek API for a full pa
 ## 7. Known limitations
 
 1. **Self-selection bias doesn't disappear.** Chat-history analysis reflects only users who joined the chat and posted — lurkers and non-joiners are invisible. This is strictly worse than the poll for any "why didn't you join" question.
-2. **Lapsed users are observationally equivalent to retained-but-quiet users.** "Last post 90 days ago" might mean "stopped using Hermes" or "using Hermes daily but no longer chats about it."
+2. **Lapsed users are observationally equivalent to retained-but-quiet users.** "Last post 90 days ago" might mean "stopped using the product" or "using it daily but no longer chats about it."
 3. **Chinese-primary classification is imperfect.** Users who code-switch heavily get misclassified; bilingual Western-diaspora Chinese users may look the same as mainland users in the data.
-4. **Topic tagging quality depends on LLM choice.** First-pass DeepSeek or Hermes-Agent-via-Volcengine will be noisy. Budget time for a human-validated sample.
+4. **Topic tagging quality depends on LLM choice.** First-pass cheap models will be noisy. Budget time for a human-validated sample.
 5. **Reply-chain reconstruction is platform-dependent.** Discord reply threads are clean; Telegram replies are clean; Slack threaded replies are clean; unthreaded Telegram groups are ambiguous.
 6. **Sarcasm, joke, in-group references** are not detected by keyword matching. LLM topic pass partially compensates but not fully.
 7. **Impersonator-site mentions** may be benign references ("oh, is that site official?") rather than endorsements. Context matters; tagging is LLM-dependent.

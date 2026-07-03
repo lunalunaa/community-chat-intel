@@ -1,25 +1,23 @@
-"""LLM topic-tagging pass for the Nous Chinese chat-history analysis pipeline.
+"""LLM topic-tagging pass for the community chat-history analysis pipeline.
 
 Tags every Chinese / mixed-language message with one of a fixed topic set by
-invoking the user's already-configured Hermes Agent (whichever provider they
-have set up — DeepSeek via custom endpoint, kimi-coding-cn, zai/GLM, whatever).
+shelling out to a locally-configured LLM CLI tool (any CLI that accepts a
+prompt and prints the response to stdout). Configure the command via the
+LLM_CLI environment variable (space-separated, default: "hermes chat -q") —
+see run_llm_cli() below.
 
-No direct API calls. No external API keys needed from this script. The
-DEEPSEEK / KIMI / GLM / QWEN key lives in ~/.hermes/.env where Hermes expects
-it, and Hermes handles auth, retries, rate limits, streaming. We just shell
-out to `hermes chat -q`.
+No direct API calls, no external API keys needed from this script itself —
+your provider's key lives wherever your chosen CLI expects it, and the CLI
+handles auth, retries, rate limits, streaming.
 
 WHY THIS DESIGN:
   - Respects the user's provider preference (no hard-coded provider)
-  - Dogfoods Hermes Agent itself (the thing we're analyzing users of)
+  - Reuses whatever LLM orchestration tooling you already have configured
   - Zero additional auth / SDK / dependency surface
   - Resumable via message-content hash cache
 
 USAGE:
-  # First configure DeepSeek (or any Hermes-supported provider) once:
-  #   hermes model      (interactive setup — pick DeepSeek or Kimi-CN or GLM)
-  # or set DEEPSEEK_API_KEY in ~/.hermes/.env directly
-  # then:
+  # First configure a provider on your chosen CLI once, then:
   python3 topics.py \\
       --users-json ./out/users.json \\
       --input-chat ./discord_export.json \\
@@ -63,12 +61,12 @@ TOPIC_CATEGORIES = [
     "install_report",     # reporting install issue or sharing a fix
     "provider_config",    # model provider setup or API key questions
     "messaging_adapter",  # IM platform integration questions (Feishu / WeChat / etc.)
-    "feature_usage",      # using skills / memory / cron / subagents / MCP / etc.
+    "feature_usage",      # using product-specific features (skills / memory / cron / etc.)
     "model_discussion",   # which model is best / benchmarks / comparisons
     "community_meta",     # announcements, meetups, links to external content
     "brand_identity",     # "is [X site] official?" / authenticity questions
     "bug_report",         # reproducible technical issue
-    "feature_request",    # "I wish Hermes could..."
+    "feature_request",    # "I wish this product could..."
     "success_story",      # showing off something they built
     "general_discussion", # catch-all, including casual chat
 ]
@@ -77,17 +75,17 @@ TOPIC_CATEGORIES = [
 # Prompt construction
 # ----------------------------------------------------------------------------
 SYSTEM_PROMPT_HEADER = """\
-You are a Chinese/English-bilingual message classifier for the Nous Hermes Agent community chat.
+You are a Chinese/English-bilingual message classifier for a product's community chat.
 
 For each message in the input batch, assign exactly ONE primary topic from this list:
-  - install_help       : user is asking HOW to install / deploy Hermes Agent or a dependency
+  - install_help       : user is asking HOW to install / deploy the product or a dependency
   - install_report     : user is sharing an install experience, fix, or error
   - provider_config    : questions or discussion about model provider setup / API keys / config
   - messaging_adapter  : questions or discussion about IM platform integration (Feishu, WeChat, WeCom, DingTalk, Telegram, Discord-as-adapter, etc.)
-  - feature_usage      : using skills / memory / cron / subagents / MCP / browser / vision / etc.
+  - feature_usage      : using product-specific features (skills / memory / cron / subagents / MCP / browser / vision / etc.)
   - model_discussion   : comparing models, benchmarks, opinions about which LLM is best
   - community_meta     : announcements, links to external content, meetups, events
-  - brand_identity     : asking whether a `.cn` site / WeChat group / other Chinese-language resource is official
+  - brand_identity     : asking whether a site / WeChat group / other Chinese-language resource is official
   - bug_report         : reporting a reproducible technical issue
   - feature_request    : requesting a new feature or capability
   - success_story      : showing off a workflow, demo, or success
@@ -100,10 +98,10 @@ Return a JSON array. One element per input message. Each element has exactly:
 Do not include any other text, markdown, or explanation. Only the JSON array.
 
 Examples:
-  Input:  [{"id": "m1", "text": "怎么配置 kimi-coding-cn? 报错了 unauthorized"}]
+  Input:  [{"id": "m1", "text": "怎么配置这个 provider? 报错了 unauthorized"}]
   Output: [{"id": "m1", "topic": "provider_config"}]
 
-  Input:  [{"id": "m2", "text": "有人在 hermes-agent.org.cn 上看过介绍吗？是官方的吗"}]
+  Input:  [{"id": "m2", "text": "有人在 example-product.org.cn 上看过介绍吗？是官方的吗"}]
   Output: [{"id": "m2", "topic": "brand_identity"}]
 """
 
@@ -121,14 +119,15 @@ def build_batch_prompt(batch: list[dict[str, str]]) -> str:
 
 
 # ----------------------------------------------------------------------------
-# Hermes invocation
+# LLM CLI invocation
 # ----------------------------------------------------------------------------
 
-def call_hermes(prompt: str, provider: str | None = None, model: str | None = None,
+def call_llm_cli(prompt: str, provider: str | None = None, model: str | None = None,
                 timeout: int = 180) -> str:
-    """Shell out to `hermes chat -q ... --quiet`.
+    """Shell out to a local LLM CLI tool ("hermes chat -q ..." by default).
 
-    Returns the raw stdout (with the leading `session_id: ...` line stripped).
+    Returns the raw stdout (with the leading `session_id: ...` line stripped,
+    a quirk of the default CLI's --quiet output).
     Raises subprocess.CalledProcessError or TimeoutExpired on failure.
     """
     cmd = [
@@ -290,14 +289,14 @@ def process_batch(
 
     # Try once, retry once with smaller batch on parse failure
     try:
-        raw = call_hermes(prompt, provider=provider, model=model)
+        raw = call_llm_cli(prompt, provider=provider, model=model)
     except subprocess.TimeoutExpired:
-        print(f"[hermes] timeout on batch of {len(to_tag)}; marking all as general_discussion", file=sys.stderr)
+        print(f"[llm-cli] timeout on batch of {len(to_tag)}; marking all as general_discussion", file=sys.stderr)
         for m in to_tag:
             results[m.message_id] = "general_discussion"
         return results
     except subprocess.CalledProcessError as e:
-        print(f"[hermes] error on batch of {len(to_tag)}: {e.stderr[:500]}", file=sys.stderr)
+        print(f"[llm-cli] error on batch of {len(to_tag)}: {e.stderr[:500]}", file=sys.stderr)
         for m in to_tag:
             results[m.message_id] = "general_discussion"
         return results
@@ -311,7 +310,7 @@ def process_batch(
         for m in to_tag:
             single_prompt = build_batch_prompt([{"id": m.message_id, "text": m.content[:800]}])
             try:
-                single_raw = call_hermes(single_prompt, provider=provider, model=model)
+                single_raw = call_llm_cli(single_prompt, provider=provider, model=model)
                 single_parsed = parse_llm_response(single_raw, [m.message_id])
                 if single_parsed:
                     parsed.update(single_parsed)
@@ -433,7 +432,7 @@ def run(
 # ----------------------------------------------------------------------------
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="LLM topic-tagging pass for Nous Chinese chat analysis.")
+    p = argparse.ArgumentParser(description="LLM topic-tagging pass for community chat analysis.")
     p.add_argument("--input-chat", required=True, type=Path,
                    help="Chat export JSON (same file used with analyze.py)")
     p.add_argument("--platform", required=True, choices=list(analyze.ADAPTERS.keys()))
@@ -457,21 +456,24 @@ def main() -> int:
                    help="Only process the first N Chinese messages (for testing / cost-capping)")
     args = p.parse_args()
 
-    # Check hermes is available unless dry-run
+    # Check the LLM CLI is available unless dry-run
     if not args.dry_run:
         try:
             r = subprocess.run(["hermes", "--version"], capture_output=True, text=True, timeout=10)
             if r.returncode != 0:
-                print("[error] `hermes --version` failed. Is Hermes Agent installed and on PATH?",
+                print("[error] `hermes --version` failed. Is your LLM CLI installed and on PATH? "
+                      "(edit call_llm_cli() to point at your own CLI if it isn't named `hermes`)",
                       file=sys.stderr)
                 return 2
-            print(f"[hermes] {r.stdout.strip().splitlines()[0] if r.stdout else 'found'}",
+            print(f"[llm-cli] {r.stdout.strip().splitlines()[0] if r.stdout else 'found'}",
                   file=sys.stderr)
         except FileNotFoundError:
-            print("[error] `hermes` not found on PATH. Install Hermes Agent first.", file=sys.stderr)
+            print("[error] `hermes` not found on PATH. Install your LLM CLI of choice, "
+                  "or edit call_llm_cli() to invoke a different command.",
+                  file=sys.stderr)
             return 2
         except subprocess.TimeoutExpired:
-            print("[error] `hermes --version` timed out. Hermes may be misconfigured.", file=sys.stderr)
+            print("[error] `hermes --version` timed out. Your LLM CLI may be misconfigured.", file=sys.stderr)
             return 2
 
     run(

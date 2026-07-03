@@ -128,26 +128,24 @@ context += f"""
 Write a comprehensive descriptive survey in markdown with these sections:
 
 1. **Executive Summary** (200 words max) — TL;DR of what this community is and talks about
-2. **Who Are They?** — IMPORTANT: anchor membership on the 3,124 live total (3,119 humans + 5 bots). Discuss the lurker-dominant reality (72% of humans never post), the viral founding-day spike (1,038 new joiners on 2026-04-04), the tiny core engagement cohort (103 humans active 7+ days = 3.3% of membership), and extreme concentration (top 10 posters = 35% of messages = 0.32% of humans).
-3. **What Do They Talk About?** — topic distribution interpreted; what the 42% general_discussion means vs the 6.7% messaging_adapter, etc.
-4. **Provider / Gateway Landscape** — what they actually use and why (Nous Portal, direct APIs, OpenRouter, proxy resellers); include sentiment
-5. **Messaging Platform Usage** — Feishu/WeChat/DingTalk breakdown from Stream C messaging_intent + the 6.7% of topic traffic
+2. **Who Are They?** — IMPORTANT: anchor membership on the ground-truth numbers above (do not trust any other membership figure derived from message metadata). Discuss the lurker-vs-poster split, any viral spike days, the size of the core engagement cohort, and message concentration among top posters.
+3. **What Do They Talk About?** — topic distribution interpreted; what the dominant category means vs the smaller ones
+4. **Provider / Gateway Landscape** — what they actually use and why (hosted service, direct APIs, OpenRouter, proxy resellers); include sentiment
+5. **Messaging Platform Usage** — Feishu/WeChat/DingTalk breakdown from Stream C messaging_intent + the topic-distribution share for messaging_adapter
 6. **Install & Setup Reality** — what install paths they use, what breaks
-7. **Competitor Landscape** — OpenClaw vs Hermes vs Claude Code vs Codex vs Kimi Claw; include the slang patterns (龙虾, 爱马仕)
-8. **Brand Identity & Confusion** — new competitors surfaced (MaxHermes, nanobot, aigc.green cluster), impersonator signals
-9. **API Key Sharing / Gray Market** — the 291 incidents: resellers, group purchases, invite codes, leaked keys
-10. **Pricing / Token Consumption** — what they complain about (esp. Hermes's higher token burn vs OpenClaw)
-11. **Network / VPN / Geographic Friction** — what the 380 friction incidents show
+7. **Competitor Landscape** — this product vs named competitors; include any slang/nickname patterns observed
+8. **Brand Identity & Confusion** — new impersonators/clones surfaced, brand-confusion signals
+9. **API Key Sharing / Gray Market** — resellers, group purchases, invite codes, leaked keys (cite the actual incident count from Stream C)
+10. **Pricing / Token Consumption** — what they complain about
+11. **Network / VPN / Geographic Friction** — what the friction incidents show
 12. **Feature Requests & Success Stories** — what users ASK for and what they BUILD
-13. **Help Ecosystem Health** — reply-graph signals, answered-rate — and note that only 878 of 3,119 humans ever participated, so "help rate" denominators matter
+13. **Help Ecosystem Health** — reply-graph signals, answered-rate — note the denominator caveat (only a fraction of humans ever post, so "help rate" denominators matter)
 14. **Notable Quotes / Texture** — 8-10 representative verbatim-style excerpts (paraphrase from the exemplar facts)
 
 Rules:
-- This is a SURVEY, not strategy. No P0/P1 recommendations, no "Nous should..." advice.
-- Cite specific numbers wherever possible, ANCHORED TO GROUND TRUTH: 3,124 total members (3,119 humans + 5 bots), 878 human posters, 2,241 lurkers.
-- NEVER cite the old "884 users" figure — that was incorrect (it conflated posters with membership).
-- Where Stream B, C, and A disagree (e.g., 19 brand_identity tags vs 450 brand_confusion facts), EXPLAIN WHY.
-- Preserve Chinese terms in parens where useful: "小龙虾 (OpenClaw slang)", "爱马仕 (Hermes slang)", etc.
+- This is a SURVEY, not strategy. No P0/P1 recommendations, no "we should..." advice.
+- Cite specific numbers wherever possible, ANCHORED TO THE GROUND-TRUTH DATA ABOVE — never a number derived only from message metadata when a verified figure is available.
+- Where Stream B, C, and A disagree on the same signal, EXPLAIN WHY (see Limitations discussion in docs/PIPELINE.md for common causes).
 - Write in clear, direct English. Don't pad.
 - 4,000-6,000 words total.
 - Output markdown only. No preamble like "Here is the writeup".
@@ -155,13 +153,13 @@ Rules:
 
 print(f"Context size: {len(context):,} chars", flush=True)
 
-# Call MiMo v2.5-pro
+# Call the configured LLM (pro/stronger variant recommended for this step)
 cmd = ["hermes", "chat", "-q", context, "--quiet", "--ignore-rules", "--ignore-user-config",
        "--max-turns", "1", "--source", "tool",
        "--provider", os.environ.get("LLM_PROVIDER", "nous"),
        "--model", os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro")]
 
-print("Calling xiaomi/mimo-v2.5-pro for synthesis...", flush=True)
+print("Calling LLM for synthesis...", flush=True)
 import time
 t0 = time.time()
 r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)

@@ -10,7 +10,7 @@ This repo is the **generalized, open-sourced version** of a project originally b
 
 - **Multi-stream analysis architecture** — four independent analysis techniques (broad LLM topic tagging, local-embedding semantic retrieval + FAISS, structured LLM fact extraction with tolerant JSON retry, and pure-Python deterministic analytics) run in parallel over the same corpus and get reconciled by a final synthesis pass. Each stream compensates for another's blind spots — see [`docs/PIPELINE.md`](docs/PIPELINE.md) for the full rationale.
 - **Ground-truth anchoring** — chat platforms that don't log "member left" events (Feishu/Lark, and effectively most groups without admin logs) make join-event counts systematically overstate current membership. The pipeline pins retention/engagement denominators to a manually-verified live membership count instead of trusting derived numbers.
-- **Zero-dependency LLM orchestration** — every LLM call shells out to the user's own [Hermes Agent](https://github.com/NousResearch/hermes-agent) CLI (`hermes chat -q ...`), so there are no API keys hardcoded anywhere in this codebase and switching providers is a one-flag change (`LLM_PROVIDER` / `LLM_MODEL` env vars).
+- **Zero-dependency LLM orchestration** — every LLM call shells out to a locally-configured LLM CLI (`hermes chat -q ...` by default), so there are no API keys hardcoded anywhere in this codebase and switching providers is a one-flag change (`LLM_PROVIDER` / `LLM_MODEL` env vars). Swap the `cmd` list in each stream script if you use a different CLI.
 - **Privacy-by-default** — every user ID is SHA-256-hashed with a local salt before it ever reaches a JSON output file; display names are redacted unless explicitly opted in.
 - **A generated, self-contained HTML dashboard** — no server, no build step, Chart.js via CDN, data embedded at generation time (see [`docs/DASHBOARD.md`](docs/DASHBOARD.md); dashboard generator lives in the daily-monitoring companion service, not included in this trimmed repo).
 
@@ -88,7 +88,7 @@ All stream scripts (`stream_b_embed_retrieve.py`, `stream_c_fact_extract.py`, `s
 | `SALT_FILE` | User-ID hashing salt (auto-generate with `analyze.py` on first run) | `./user_hash_salt.key` |
 | `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` | Manually-verified live membership (Stream D denominator) | `0` (must be set for meaningful output) |
 | `GROUND_TRUTH_SOURCE` | Free-text provenance note for the ground-truth numbers | `"platform admin UI, manually verified"` |
-| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_MODEL_PRO` | Which Hermes-configured provider/model to shell out to | `nous` / `xiaomi/mimo-v2.5` / `xiaomi/mimo-v2.5-pro` |
+| `LLM_PROVIDER` / `LLM_MODEL` / `LLM_MODEL_PRO` | Which provider/model your LLM CLI should use | `nous` / `xiaomi/mimo-v2.5` / `xiaomi/mimo-v2.5-pro` (example — use whatever you have configured) |
 | `COMMUNITY_NAME`, `CORPUS_DESCRIPTION`, `GROUND_TRUTH_SUMMARY` | Free-text context injected into the cross-stream synthesis prompt | generic examples |
 | `SURVEY_SUBJECT`, `STRUCTURAL_CONTEXT`, `RECOMMENDATION_FOCUS_AREAS` | Free-text context injected into the recommendations-generation prompt | generic placeholders |
 | `REPORT_TITLE`, `REPORT_SUBJECT`, `REPORT_PERIOD`, `REPORT_CLASSIFICATION` | Front-matter for the final assembled report | generic placeholders |

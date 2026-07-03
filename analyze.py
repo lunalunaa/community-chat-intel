@@ -1,4 +1,4 @@
-"""Nous Chinese chat-history analysis pipeline.
+"""Community chat-history analysis pipeline.
 
 Reads a platform-native chat export (Discord JSON, Telegram JSON, or a pre-
 normalized canonical JSON), produces:
@@ -22,7 +22,7 @@ The pipeline stages:
   1. Load adapter (platform-specific → canonical schema)
   2. Language classify each message
   3. Build per-user profiles
-  4. Keyword extraction (providers, claws, messaging, features, friction, shadow, acquisition)
+  4. Keyword extraction (providers, competitors, messaging, features, friction, shadow, acquisition)
   5. Question detection + reply-graph for help-answered-rate
   6. Retention cohort assignment
   7. Aggregate stats
@@ -606,7 +606,7 @@ class UserProfile:
     channels: set[str] = field(default_factory=set)
     # Keyword hits
     providers: collections.Counter = field(default_factory=collections.Counter)
-    claws: collections.Counter = field(default_factory=collections.Counter)
+    competitors: collections.Counter = field(default_factory=collections.Counter)
     messaging: collections.Counter = field(default_factory=collections.Counter)
     features: collections.Counter = field(default_factory=collections.Counter)
     install: collections.Counter = field(default_factory=collections.Counter)
@@ -645,7 +645,7 @@ def extract_urls(text: str) -> list[str]:
 
 def classify_url(url: str) -> tuple[str, str]:
     """Return (category, domain). Categories: official, impersonator, hf, modelscope,
-    chinese_vendor, claw_vendor, messaging, other."""
+    chinese_vendor, competitor_vendor, messaging, other."""
     url_l = url.lower()
     domain = re.sub(r"^https?://", "", url_l).split("/")[0]
     for d in kw.IMPERSONATOR_DOMAINS:
@@ -695,7 +695,7 @@ def run_pipeline(
     channel_counts = collections.Counter()
     channel_zh_counts = collections.Counter()
     provider_counts = collections.Counter()
-    claw_counts = collections.Counter()
+    competitor_counts = collections.Counter()
     messaging_counts = collections.Counter()
     feature_counts = collections.Counter()
     install_counts = collections.Counter()
@@ -773,13 +773,13 @@ def run_pipeline(
         for label in kw.match_any(content, kw.PROVIDERS_COMPILED):
             user.providers[label] += 1
             provider_counts[label] += 1
-        for label in kw.match_any(content, kw.CLAWS_COMPILED):
-            user.claws[label] += 1
-            claw_counts[label] += 1
+        for label in kw.match_any(content, kw.COMPETITORS_COMPILED):
+            user.competitors[label] += 1
+            competitor_counts[label] += 1
         for label in kw.match_any(content, kw.MESSAGING_COMPILED):
             user.messaging[label] += 1
             messaging_counts[label] += 1
-        for label in kw.match_any(content, kw.HERMES_FEATURES_COMPILED):
+        for label in kw.match_any(content, kw.PRODUCT_FEATURES_COMPILED):
             user.features[label] += 1
             feature_counts[label] += 1
         for label in kw.match_any(content, kw.INSTALL_COMPILED):
@@ -894,7 +894,7 @@ def run_pipeline(
         },
         "location_proxy": dict(tz_buckets),
         "providers": dict(provider_counts.most_common()),
-        "claws": dict(claw_counts.most_common()),
+        "competitors": dict(competitor_counts.most_common()),
         "messaging_platforms": dict(messaging_counts.most_common()),
         "features": dict(feature_counts.most_common()),
         "install_paths": dict(install_counts.most_common()),
@@ -983,7 +983,7 @@ def ensure_salt(salt_path: Path) -> str:
 # ----------------------------------------------------------------------------
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Nous Chinese chat-history analysis pipeline.")
+    parser = argparse.ArgumentParser(description="Community chat-history analysis pipeline.")
     parser.add_argument("--input", required=True, type=Path, help="Path to chat export JSON")
     parser.add_argument("--platform", required=True, choices=list(ADAPTERS.keys()))
     parser.add_argument("--out", type=Path, default=Path("./out"), help="Output directory")
@@ -1034,7 +1034,7 @@ def main() -> int:
         d = asdict(u)
         d["channels"] = sorted(u.channels)
         d["hours_of_day"] = dict(u.hours_of_day)
-        for key in ("providers", "claws", "messaging", "features", "install", "friction",
+        for key in ("providers", "competitors", "messaging", "features", "install", "friction",
                     "shadow_community", "acquisition", "impersonator_domains", "official_domains"):
             d[key] = dict(getattr(u, key))
         d["first_seen"] = u.first_seen.isoformat()

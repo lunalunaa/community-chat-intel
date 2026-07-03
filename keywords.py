@@ -1,10 +1,16 @@
-"""Keyword dictionaries for the Nous Chinese chat-history analysis pipeline.
+"""Keyword dictionaries for the community chat-history analysis pipeline.
 
 Each dictionary maps a canonical label → a list of pattern strings.
 Patterns are matched case-insensitively as whole-word / whole-phrase regex.
 CJK terms match verbatim; ASCII terms match as word-boundaries.
 
 Used by analyze.py's keyword-extraction stage.
+
+CUSTOMIZE THIS FILE for your own product/community: swap PRODUCT_FEATURES,
+IMPERSONATOR_DOMAINS, OFFICIAL_DOMAINS, and COMPETITORS for your own.
+Everything below (except those four) is generic — real LLM providers, real
+messaging platforms, real Chinese content platforms — and should work
+out of the box for most AI-product communities.
 """
 
 from __future__ import annotations
@@ -17,14 +23,11 @@ PROVIDERS: dict[str, list[str]] = {
     # Chinese providers
     "deepseek": ["deepseek", "深度求索", "深度寻索"],
     "kimi_moonshot": ["kimi", "moonshot", "月之暗面", "月暗"],
-    "kimi_cn": ["kimi-coding-cn", "kimi.cn", "kimi中国版", "moonshot-cn"],
     "qwen_alibaba": ["qwen", "通义", "通义千问", "dashscope", "百炼", "bailian"],
     "glm_zhipu": ["glm", "智谱", "chatglm", "zhipu", "bigmodel"],
     "minimax": ["minimax", "混元", "abab"],
-    "minimax_cn": ["minimax-cn", "minimaxi.com/cn"],
-    "volcengine_ark": ["volcengine", "火山引擎", "火山方舟", "方舟", "ark", "arkclaw"],
+    "volcengine_ark": ["volcengine", "火山引擎", "火山方舟", "方舟", "ark"],
     "doubao": ["doubao", "豆包"],
-    "xiaomi_mimo": ["mimo", "xiaomi-mimo", "小米mimo"],
     "baichuan": ["baichuan", "百川"],
     "yi_01ai": ["01.ai", "零一万物", "yi-"],
     # Western providers
@@ -39,35 +42,22 @@ PROVIDERS: dict[str, list[str]] = {
     "vllm": ["vllm"],
     "llamacpp": ["llama.cpp", "llamacpp", "gguf"],
     "lmstudio": ["lm studio", "lmstudio"],
-    # Nous / Hermes
-    "nous_hermes": ["nous", "hermes", "nousresearch"],
 }
 
 # ----------------------------------------------------------------------------
-# 2. Claw products — the 百虾大战 landscape
+# 2. Competitors — EXAMPLE category. Replace with your own market's
+#    competitor products / slang / nicknames. Left in with placeholder
+#    entries to show the pattern (grouping an official name + common
+#    aliases + colloquial/slang variants under one canonical label).
 # ----------------------------------------------------------------------------
-CLAWS: dict[str, list[str]] = {
-    "openclaw_upstream": ["openclaw", "clawdbot", "open claw"],
-    "claw_meme": ["龙虾", "养虾", "养龙虾", "百虾大战"],
-    "arkclaw": ["arkclaw", "ark claw", "云虾"],
-    "workbuddy": ["workbuddy", "work buddy", "codebuddy"],
-    "qclaw": ["qclaw", "q claw"],
-    "autoclaw": ["autoclaw", "auto claw", "autoglm"],
-    "kimi_claw": ["kimi claw", "kimiclaw"],
-    "maxclaw": ["maxclaw", "max claw"],
-    "copaw": ["copaw", "co paw", "agentscope"],
-    "lobsterai": ["lobsterai", "lobster ai", "有道龙虾"],
-    "countbot": ["countbot", "count bot"],
-    "duclaw": ["duclaw", "du claw"],
-    "dingding_wukong": ["钉钉悟空", "dingding wukong"],
-    "qoderwork": ["qoderwork", "qoder work"],
-    "miclaw": ["miclaw", "mi claw"],
-    "stepclaw": ["stepclaw", "step claw"],
-    "coze": ["coze", "扣子", "clawhub"],
+COMPETITORS: dict[str, list[str]] = {
+    "competitor_a": ["competitor a", "competitor-a", "competitora"],
+    "competitor_b": ["competitor b", "competitor-b", "competitorb"],
+    "competitor_c": ["competitor c", "competitor-c", "competitorc"],
 }
 
 # ----------------------------------------------------------------------------
-# 3. Messaging platforms — where do users want to run agents?
+# 3. Messaging platforms — where do users want to run agents / bots?
 # ----------------------------------------------------------------------------
 MESSAGING: dict[str, list[str]] = {
     "feishu": ["feishu", "飞书"],
@@ -87,9 +77,11 @@ MESSAGING: dict[str, list[str]] = {
 }
 
 # ----------------------------------------------------------------------------
-# 4. Hermes Agent features — what do users actually use?
+# 4. Product features — EXAMPLE category (generic AI-agent feature names).
+#    Replace with your own product's actual feature/tool names so mentions
+#    of them get tagged correctly.
 # ----------------------------------------------------------------------------
-HERMES_FEATURES: dict[str, list[str]] = {
+PRODUCT_FEATURES: dict[str, list[str]] = {
     "skills": ["skill_manage", "skill_view", "skills_list", "skills", "技能", "skill"],
     "memory": ["memory", "记忆", "持久化", "persistent memory"],
     "cron": ["cron", "cronjob", "定时任务", "scheduled task"],
@@ -115,7 +107,7 @@ INSTALL: dict[str, list[str]] = {
     "windows_native": ["windows native", "win10", "win11"],
     "uv_python": [r"\buv\b", "uv pip", "uv install"],
     "pip_python": [r"\bpip\b", "pip install"],
-    "nous_portal": ["nous portal", "portal subscription", "portal oauth"],
+    "hosted_service": ["hosted service", "managed service", "cloud subscription"],
     "vps_ssh": [r"\bssh\b", "vps", "remote server"],
 }
 
@@ -137,22 +129,21 @@ FRICTION: dict[str, list[str]] = {
 }
 
 # ----------------------------------------------------------------------------
-# 7. Impersonator / suspicious Chinese domains
+# 7. Impersonator / suspicious domains — EXAMPLE category.
+#    Replace with your own product's known impersonator/clone domains.
 # ----------------------------------------------------------------------------
 IMPERSONATOR_DOMAINS: list[str] = [
-    "hermes-agent.org.cn",
-    "hermesagentai.cn",
-    "hermesagent.org.cn",
-    "toolin.ai/blog/hermes-agent",
+    "example-product.org.cn",
+    "exampleproductai.cn",
+    "exampleproduct.org.cn",
 ]
 
-# Legitimate Nous domains (for comparison ratio)
+# Legitimate domains (for comparison ratio) — EXAMPLE category, replace with
+# your own product's real domains.
 OFFICIAL_DOMAINS: list[str] = [
-    "nousresearch.com",
-    "hermes-agent.nousresearch.com",
-    "github.com/NousResearch",
-    "github.com/nous-research",
-    "huggingface.co/NousResearch",
+    "example.com",
+    "docs.example.com",
+    "github.com/example-org",
 ]
 
 # ----------------------------------------------------------------------------
@@ -176,7 +167,7 @@ SHADOW_COMMUNITY: dict[str, list[str]] = {
 }
 
 # ----------------------------------------------------------------------------
-# 9. Acquisition-channel markers — where did users say they found Hermes?
+# 9. Acquisition-channel markers — where did users say they found the product?
 # ----------------------------------------------------------------------------
 ACQUISITION: dict[str, list[str]] = {
     "twitter_x": ["twitter", " x.com", "推特"],
@@ -235,9 +226,9 @@ def _compile_dict(d: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
 
 
 PROVIDERS_COMPILED = _compile_dict(PROVIDERS)
-CLAWS_COMPILED = _compile_dict(CLAWS)
+COMPETITORS_COMPILED = _compile_dict(COMPETITORS)
 MESSAGING_COMPILED = _compile_dict(MESSAGING)
-HERMES_FEATURES_COMPILED = _compile_dict(HERMES_FEATURES)
+PRODUCT_FEATURES_COMPILED = _compile_dict(PRODUCT_FEATURES)
 INSTALL_COMPILED = _compile_dict(INSTALL)
 FRICTION_COMPILED = _compile_dict(FRICTION)
 SHADOW_COMMUNITY_COMPILED = _compile_dict(SHADOW_COMMUNITY)

@@ -182,7 +182,7 @@ All four streams are fed into a stronger/larger model in a single large context 
 ### 1.5 Tools & infrastructure
 
 - Chat export: platform-specific official tooling (see README)
-- LLM inference: any provider reachable via your Hermes Agent config (or swap in direct API calls)
+- LLM inference: any provider reachable via your LLM CLI's config (or swap in direct API calls)
 - Embeddings: `BAAI/bge-m3` (local, CPU, via `sentence-transformers`)
 - Vector search: `faiss-cpu`
 - Analysis pipeline: this repository's Python scripts (analyze.py, topics.py, stream_b/c/d_*.py)

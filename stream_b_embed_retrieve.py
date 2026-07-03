@@ -6,8 +6,8 @@ runs structured retrieval queries, feeds top-K results to an LLM for synthesis.
 
 Uses local sentence-transformers (no API) for embeddings; the LLM synthesis
 step shells out to `hermes chat -q` so any configured provider/model works —
-override via LLM_PROVIDER / LLM_MODEL env vars (defaults shown below are a
-Nous-Portal example; swap for your own).
+override via LLM_PROVIDER / LLM_MODEL env vars (defaults shown are just an
+example; edit the `cmd` list below if your LLM CLI isn't named `hermes`).
 """
 import json
 import os
@@ -96,30 +96,34 @@ index = faiss.IndexFlatIP(embs.shape[1])  # inner product == cosine on normalize
 index.add(embs.astype('float32'))
 
 # ===== Retrieval queries =====
-# Structured queries tied to Q1/Q2/Q3
+# Structured queries — EXAMPLE set for a generic AI-agent product. Replace the
+# product name / feature names / competitor names with your own; the query
+# *shape* (feature-adapter demand, gateway-vs-direct-API usage, brand
+# confusion, pricing complaints, VPN friction, competitor comparison) is the
+# reusable part.
 QUERIES = {
-    # Q3: Feishu integration demand
-    "feishu_adapter_demand": "想要把 Hermes Agent 接入飞书机器人，飞书 webhook，飞书对接",
+    # Messaging-adapter demand
+    "feishu_adapter_demand": "想要把这个产品接入飞书机器人，飞书 webhook，飞书对接",
     "feishu_actively_building": "我正在开发飞书集成，我写了一个飞书 adapter",
-    "wechat_adapter_demand": "Hermes 能不能接入微信，微信机器人，企业微信",
-    "dingtalk_adapter_demand": "钉钉机器人，钉钉对接 Hermes",
-    # Q2: gateway / portal vs direct
-    "nous_portal_usage": "我在用 Nous Portal，nous portal 额度，门户",
+    "wechat_adapter_demand": "能不能接入微信，微信机器人，企业微信",
+    "dingtalk_adapter_demand": "钉钉机器人，钉钉对接",
+    # Gateway / hosted vs direct API
+    "hosted_service_usage": "我在用官方托管服务，额度，门户",
     "direct_vendor_api_usage": "我直接用 kimi API，minimax API key，直接调 deepseek",
     "openrouter_usage": "openrouter 更便宜，通过 openrouter 用",
     "agent_key_sharing": "大家分享一下 sk-key，谁有 API key 能借用，合租",
-    # Q1: topic texture
+    # Topic texture
     "install_friction": "安装不上，报错，无法运行，docker 启动失败",
-    "brand_identity_confusion": "这是官方吗，hermes-agent.org.cn 是真的假的，哪个是官方网站",
+    "brand_identity_confusion": "这是官方吗，是真的假的，哪个是官方网站",
     "pricing_complaints": "太贵了，免费额度用完，信用卡支付不了，限额",
     "vpn_friction": "被墙了，没法访问，需要翻墙，国内用不了",
-    "success_stories": "我用 Hermes 做了，搭建了个智能体，跑起来了",
+    "success_stories": "我用这个做了，搭建了个智能体，跑起来了",
     "feature_requests": "希望能加上，我想要一个功能，建议增加",
-    "skills_memory_cron_usage": "skill memory cron 怎么用，如何创建 skill",
-    # Bonus: competitor sentiment
-    "comparison_with_claw_products": "Hermes 对比 ArkClaw, 比 Kimi Claw 好，和 WorkBuddy 区别",
-    "comparison_with_claude_code": "比 claude code 好，比 codex 强，比 cursor",
-    # Bonus: community hubs
+    "core_feature_usage": "skill memory cron 怎么用，如何创建 skill",
+    # Competitor sentiment
+    "comparison_with_competitors": "对比竞品A, 比竞品B好，和竞品C区别",
+    "comparison_with_alt_tools": "比claude code好，比codex强，比cursor",
+    # Community hubs
     "mentions_of_external_communities": "我的微信公众号，关注我的知乎，B站视频教程",
 }
 

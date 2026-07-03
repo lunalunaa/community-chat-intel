@@ -9,9 +9,9 @@
 
 ```bash
 # Open the dashboard in your default browser
-open ~/nous-chinese-analysis/dailies/dashboard.html    # macOS
-xdg-open ~/nous-chinese-analysis/dailies/dashboard.html  # Linux
-start ~/nous-chinese-analysis/dailies/dashboard.html     # Windows/WSL
+open ~/your-analysis-dir/dailies/dashboard.html    # macOS
+xdg-open ~/your-analysis-dir/dailies/dashboard.html  # Linux
+start ~/your-analysis-dir/dailies/dashboard.html     # Windows/WSL
 ```
 
 Or just double-click `dashboard.html` in your file manager.
@@ -26,7 +26,7 @@ The dashboard is a responsive grid of cards, each showing one metric or chart. I
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  🐚 Hermes Agent · 中文社区 Dashboard           │
+│  🐚 Product · 中文社区 Dashboard                │
 │  Chat name · member count · last updated        │
 ├──────────────────┬──────────────────────────────┤
 │  📊 Today        │  📈 Activity (7 days)        │
@@ -110,7 +110,7 @@ Keyword hits grouped by category, with raw counts:
 | **MESSAGING** | Feishu, WeChat, DingTalk, Discord, Telegram, etc. |
 | **FEATURES** | skills, memory, cron, delegate, MCP, browser, vision, etc. |
 | **FRICTION** | error, timeout, VPN, confused, broken, key issues, etc. |
-| **CLAWS** | OpenClaw, ArkClaw, Kimi Claw, WorkBuddy, Coze, etc. |
+| **COMPETITORS** | Named competitor products in your market (configure your own list in `keywords.py`) |
 
 Only the top 5 per category are shown. If a category is absent, no keywords of that type were detected today.
 
@@ -250,7 +250,7 @@ The default is GitHub's dark theme. For a light theme, swap the values.
 If you want to serve the dashboard over HTTP instead of opening files locally:
 
 ```bash
-cd ~/nous-chinese-analysis/dailies
+cd ~/your-analysis-dir/dailies
 python3 -m http.server 8080
 # → http://localhost:8080/dashboard.html
 ```

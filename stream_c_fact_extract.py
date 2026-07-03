@@ -64,11 +64,11 @@ CHUNK_SIZE = 100
 chunks = [messages[i:i+CHUNK_SIZE] for i in range(0, len(messages), CHUNK_SIZE)]
 print(f"[stream_c] {len(chunks)} chunks of ≤{CHUNK_SIZE} messages", flush=True)
 
-EXTRACTION_PROMPT = """You are analyzing a chunk of chat messages from the Chinese Hermes Agent community on Feishu. Extract structured facts. Output a single valid JSON object matching this schema (omit arrays that have no instances):
+EXTRACTION_PROMPT = """You are analyzing a chunk of chat messages from a product's community chat (Chinese-language, on a Feishu-style platform). Extract structured facts. Output a single valid JSON object matching this schema (omit arrays that have no instances):
 
 {
   "install_problems": [{"user_ref": "a short tag like 'user_A' or actual @name", "problem": "what broke", "os_or_context": "optional", "resolved": true/false/null}],
-  "provider_usage": [{"user_ref": "...", "provider_or_gateway": "nous_portal | openrouter | direct_kimi | direct_minimax | direct_glm | direct_volcengine | direct_deepseek | direct_qwen | proxy_reseller | self_hosted | anthropic | openai | other", "sentiment": "positive | negative | neutral", "quoted_context": "short"}],
+  "provider_usage": [{"user_ref": "...", "provider_or_gateway": "hosted_service | openrouter | direct_kimi | direct_minimax | direct_glm | direct_volcengine | direct_deepseek | direct_qwen | proxy_reseller | self_hosted | anthropic | openai | other", "sentiment": "positive | negative | neutral", "quoted_context": "short"}],
   "messaging_intent": [{"user_ref": "...", "platform": "feishu | wechat | dingtalk | qq | slack | discord | telegram | lark_intl | other", "intent": "exploring | wants_adapter | actively_building | using_via_existing_adapter", "context": "short"}],
   "brand_confusion": [{"user_ref": "...", "question": "what they asked", "resolution": "answered | unanswered | conflicting"}],
   "api_key_sharing_evidence": [{"user_ref": "...", "type": "offering | seeking | reselling | group_purchase", "details": "short"}],
@@ -76,7 +76,7 @@ EXTRACTION_PROMPT = """You are analyzing a chunk of chat messages from the Chine
   "feature_requests": [{"user_ref": "...", "feature": "what they want", "use_case": "short"}],
   "success_stories": [{"user_ref": "...", "what_built": "short", "tools_used": ["skills", "memory", "cron", "mcp", ...]}],
   "vpn_network_friction": [{"user_ref": "...", "issue": "short", "workaround": "optional"}],
-  "competitor_mentions": [{"user_ref": "...", "competitor": "arkclaw | kimiclaw | workbuddy | coze | claude_code | codex | cursor | other", "stance": "favoring_hermes | favoring_competitor | neutral_comparison"}]
+  "competitor_mentions": [{"user_ref": "...", "competitor": "competitor_a | competitor_b | competitor_c | other", "stance": "favoring_product | favoring_competitor | neutral_comparison"}]
 }
 
 Rules:
