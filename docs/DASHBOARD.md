@@ -1,9 +1,8 @@
 # Dashboard — Usage & Interpretation Guide
 
-> **Scope note:** this document describes a companion daily-monitoring service (`daily_service.py`) that generates the dashboard below. That service is **not included in this repo** — it depends on org-specific scheduling/delivery infrastructure and isn't part of the core `chatintel` package. This doc is kept as a design reference / worked example for anyone building their own daily-digest service on top of `chatintel-analyze`'s output (see the "Daily Monitoring Service" note in `docs/PIPELINE.md`'s File Reference section for the minimal shape to replicate).
+> **Scope note:** this document describes a companion daily-monitoring service that generates the dashboard below. That service is **not included in this repo** — it depends on org-specific scheduling/delivery infrastructure and isn't part of the core `chatintel` package. This doc is kept as a design reference for anyone building their own daily-digest service on top of `chatintel-analyze`'s output (see `docs/PIPELINE.md` File Reference section for the minimal shape to replicate).
 
-> The daily service renders a self-contained HTML dashboard at `dailies/dashboard.html`.  
-> No server, no build step — open it in any browser. Everything is embedded.
+The daily service renders a self-contained HTML dashboard at `dailies/dashboard.html`. No server, no build step — open it in any browser. Everything is embedded.
 
 ---
 
@@ -11,9 +10,9 @@
 
 ```bash
 # Open the dashboard in your default browser
-open ~/your-analysis-dir/dailies/dashboard.html    # macOS
-xdg-open ~/your-analysis-dir/dailies/dashboard.html  # Linux
-start ~/your-analysis-dir/dailies/dashboard.html     # Windows/WSL
+open ~/your-analysis-dir/dailies/dashboard.html        # macOS
+xdg-open ~/your-analysis-dir/dailies/dashboard.html    # Linux
+start ~/your-analysis-dir/dailies/dashboard.html       # Windows/WSL
 ```
 
 Or just double-click `dashboard.html` in your file manager.
@@ -28,13 +27,14 @@ The dashboard is a responsive grid of cards, each showing one metric or chart. I
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  🐚 Product · 中文社区 Dashboard                │
+│  Product · Community Dashboard                   │
 │  Chat name · member count · last updated        │
 ├──────────────────┬──────────────────────────────┤
 │  📊 Today        │  📈 Activity (7 days)        │
 │  KPIs: msgs,     │  Bar chart: daily message    │
-│  users, Chinese, │  volume with today           │
-│  questions,      │  highlighted                 │
+│  users, target-  │  volume with today           │
+│  language,       │  highlighted                 │
+│  questions,      │                              │
 │  friction        │                              │
 ├──────────────────┼──────────────────────────────┤
 │  👥 Users (7d)   │  🔥 Top Keywords (today)     │
@@ -63,15 +63,15 @@ The dashboard is a responsive grid of cards, each showing one metric or chart. I
 
 ### 📊 Today — KPIs
 
-Four key performance indicators for the most recent day of data:
+Key performance indicators for the most recent day of data:
 
 | Metric | What it tells you |
 |--------|-------------------|
 | **Messages** | Total messages today. Compare day-over-day in the activity chart. |
-| **Active users** | Unique posters today. Typical range: 30–80 for a 3K-member chat. |
-| **Target-language** | Messages flagged as target-language or mixed-language by the configured `LanguageProfile` (see `src/chatintel/core/languages.py`) — script-ratio for CJK/Cyrillic/Arabic/etc., stopword-ratio for Latin-script languages. Usually 70-90% of messages for a well-scoped target-language chat. |
-| **Questions** | Messages ending in `?`/`？`/`吗`/`呢` or containing question keywords. |
-| **Friction signals** | Errors, VPN complaints, timeout, confusion, API key issues, and other problem keywords. |
+| **Active users** | Unique posters today. |
+| **Target-language** | Messages flagged as target-language or mixed-language by the configured `LanguageProfile` (see `src/chatintel/core/languages.py`) — script-ratio for CJK/Cyrillic/Arabic/etc., stopword-ratio for Latin-script languages. |
+| **Questions** | Messages ending in question markers or containing question keywords (per the active language profile). |
+| **Friction signals** | Errors, network complaints, timeout, confusion, API key issues, and other problem keywords. |
 
 > **Healthy:** messages stable or growing, users diverse, friction <15% of messages.  
 > **Watch:** message count dropping 3+ days, friction spiking, active users concentrating in top 3.
@@ -80,10 +80,10 @@ Four key performance indicators for the most recent day of data:
 
 ### 📈 Activity — 7-Day Bar Chart
 
-A Chart.js bar chart showing daily message volume for the last 7 days (up to 14 when data exists). Today's bar is highlighted in bright blue; previous days are faded.
+A Chart.js bar chart showing daily message volume for the last 7 days (up to 14 when data exists). Today's bar is highlighted; previous days are faded.
 
 **What to look for:**
-- **Weekday/weekend pattern** — Chinese tech communities often drop 30-50% on weekends
+- **Weekday/weekend pattern** — many tech communities drop 30-50% on weekends
 - **Sudden spikes** — viral content shares, new release announcements, or a hot topic blowing up
 - **Declining trend** — 5+ days of declining volume may signal community fatigue or a competing platform draining attention
 
@@ -96,7 +96,7 @@ A Chart.js line chart of unique active posters per day. Green fill under the cur
 **What to look for:**
 - **Flat or rising line** — community is maintaining or growing its active core
 - **Declining line with stable message count** — fewer people are talking more (concentration risk)
-- **Spike + return to baseline** — one-day influx (QR code share, external link) with low retention
+- **Spike + return to baseline** — one-day influx with low retention
 
 The ratio between this chart and the activity chart matters. If messages stay high but users drop, the top 3-5 posters are carrying the conversation — fragile if any of them leave.
 
@@ -108,11 +108,11 @@ Keyword hits grouped by category, with raw counts:
 
 | Category | What it covers |
 |----------|---------------|
-| **PROVIDERS** | DeepSeek, Kimi, Qwen, GLM, Volcengine, Anthropic, OpenAI, etc. |
-| **MESSAGING** | Feishu, WeChat, DingTalk, Discord, Telegram, etc. |
-| **FEATURES** | skills, memory, cron, delegate, MCP, browser, vision, etc. |
-| **FRICTION** | error, timeout, VPN, confused, broken, key issues, etc. |
-| **COMPETITORS** | Named competitor products in your market (configure your own list in `keywords.py`) |
+| **PROVIDERS** | LLM/API providers mentioned in your ecosystem (configure in `keywords.py`) |
+| **MESSAGING** | Chat platforms referenced (configure in `keywords.py`) |
+| **FEATURES** | Your product's feature names (configure in `keywords.py`) |
+| **FRICTION** | error, timeout, network issues, confusion, broken, key issues, etc. |
+| **COMPETITORS** | Named competitor products in your market (configure in `keywords.py`) |
 
 Only the top 5 per category are shown. If a category is absent, no keywords of that type were detected today.
 
@@ -124,8 +124,6 @@ Only the top 5 per category are shown. If a category is absent, no keywords of t
 
 A table showing which keyword labels were mentioned most today, with a proportional bar visualization. Each row shows the label, raw count, and share of total keyword hits.
 
-The bar fills proportionally to the highest-count label, making it easy to spot dominant topics at a glance.
-
 > **Not a true topic model** — these are keyword-hit aggregates, not LLM-classified topics. Use the digest (below) for semantic topic understanding; use this for quick distribution scanning.
 
 ---
@@ -133,7 +131,7 @@ The bar fills proportionally to the highest-count label, making it easy to spot 
 ### ⚠️ Friction Signals — 7-Day Dual Line Chart
 
 Two overlaid line charts:
-- **Red (Friction):** Daily count of friction keyword hits (errors, VPN, timeout, confusion, etc.)
+- **Red (Friction):** Daily count of friction keyword hits (errors, network issues, timeout, confusion, etc.)
 - **Amber (Questions):** Daily count of detected question messages
 
 **What to look for:**
@@ -155,7 +153,7 @@ Sections within the digest:
 - **Notable** — long threads, resolved questions, success stories, competitor mentions, brand confusion incidents
 - **TL;DR** — one-sentence summary
 
-> The digest is generated by MiMo v2.5 with a single LLM call per day (~$0.02). It synthesizes the keyword data plus a sample of actual messages to produce a coherent narrative. If MiMo is unavailable, a lightweight fallback digest is generated from keyword stats alone.
+> The digest is generated by a single LLM call per day (~$0.02). It synthesizes the keyword data plus a sample of actual messages to produce a coherent narrative. If the LLM is unavailable, a lightweight fallback digest is generated from keyword stats alone.
 
 ---
 
@@ -173,7 +171,7 @@ Last 7 days of digests as a compact list: date, message count, active user count
 |-----------|----------------|
 | Messages | 150-400/day, slight weekday/weekend oscillation |
 | Users | 25-60/day, no single user above 15% of messages |
-| Chinese share | 70-90% (normal for a Chinese-language chat) |
+| Target-language share | 70-90% (normal for a well-scoped target-language chat) |
 | Friction | Under 20% of messages, flat or declining trend |
 | Questions | 15-40/day, most answered (see digest) |
 | Keywords | Diverse across providers/messaging/features; no single topic dominating >40% |
@@ -186,21 +184,7 @@ Last 7 days of digests as a compact list: date, message count, active user count
 | Friction spiking 2×+ | Outage, breaking change, or provider deprecation |
 | Users declining while messages stable | Concentration in top posters — fragile |
 | Single keyword dominating (>50%) | Crisis or monoculture — check digest immediately |
-| Zero messages | Fetch failed (lark-cli auth expired) — check `daily_service.py --status` |
-
-### Checking if the fetch is healthy
-
-```bash
-python3 daily_service.py --status
-```
-
-Look at the `Last fetch` timestamp. If it's more than 25 hours old and `Lark auth` shows ✗, the daily cron is failing silently. Re-authenticate:
-
-```bash
-/tmp/larkwrap.sh auth login --scope "im:message:readonly im:chat:read im:chat.members:read contact:user.base:readonly"
-```
-
-(`/tmp/larkwrap.sh` is a placeholder for whatever lark-cli auth wrapper your own daily-service implementation uses — see the scope note at the top of this file.)
+| Zero messages | Fetch failed — check your daily service's status |
 
 ---
 
@@ -220,12 +204,12 @@ Look at the `Last fetch` timestamp. If it's more than 25 hours old and `Lark aut
 
 ### Changing the time window
 
-The dashboard shows up to 14 days of charts. To change this, edit the `LIMIT 14` in `generate_dashboard()` in `daily_service.py`.
+The dashboard shows up to 14 days of charts. To change this, edit the `LIMIT 14` in `generate_dashboard()` in your daily service implementation.
 
 ### Adding a new chart
 
 1. Add your metric to the `daily_stats` table (add a column in `init_db()`)
-2. Populate it in `_run_analysis_and_digest()`
+2. Populate it in your analysis-and-digest function
 3. Add a `<canvas>` element and Chart.js block to the `DASHBOARD_HTML` template
 4. The data flows through `dashboard_data.json` → `DATA` JS object automatically
 
