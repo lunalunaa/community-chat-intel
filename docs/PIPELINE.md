@@ -486,6 +486,7 @@ parallax/
 │   │   ├── crosstabs.py          # Cross-tabulation helper (parallax-crosstabs)
 │   │   ├── config.py             # YAML config loader (PARALLAX_CONFIG_DIR)
 │   │   ├── diff.py               # Stats comparison tool (parallax-diff)
+│   │   ├── init.py               # Project scaffolder (parallax-init)
 │   │   └── state.py              # SQLite state store for --incremental
 │   │
 │   ├── config/                   # YAML config files (override via PARALLAX_CONFIG_DIR)

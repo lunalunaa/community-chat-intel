@@ -67,6 +67,7 @@ jobs:
                   uv run parallax-topics --help | head -1
                   uv run parallax-crosstabs --help | head -1
                   uv run parallax-diff --help | head -1
+                  uv run parallax-init --help | head -1
             - name: Smoke-test pipeline on synthetic data
               working-directory: ${{ github.workspace }}
               run: |

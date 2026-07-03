@@ -15,6 +15,18 @@ Multi-language and multi-region out of the box — pick your target market with 
 
 ## Quick start
 
+**Option A — Scaffold a new project:**
+
+```bash
+pip install parallax
+parallax init my-project --platform discord --language ja --region jp
+cd my-project
+# place your export in data/, then:
+parallax-analyze --input data/export.json --platform discord --out out/ -v
+```
+
+**Option B — From source:**
+
 ```bash
 git clone https://github.com/lunalunaa/parallax.git
 cd parallax
@@ -133,6 +145,7 @@ src/parallax/
 │   ├── crosstabs.py             # cross-tabulation helper (parallax-crosstabs)
 │   ├── config.py                # YAML config loader (fact_schema, queries, etc.)
 │   ├── diff.py                  # stats comparison tool (parallax-diff)
+│   ├── init.py                  # project scaffolder (parallax-init)
 │   └── state.py                 # SQLite state store for --incremental
 ├── config/                      # YAML config files (override via PARALLAX_CONFIG_DIR)
 │   ├── fact_schema.yaml         # Stream C extraction schema
