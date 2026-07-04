@@ -10,8 +10,8 @@ Env vars:
   CHAT_JSONL         Path to raw NDJSON export (default ./data/pages.jsonl)
   OUT_DIR            Output directory (default ./out/stream_c)
   SALT_FILE          User-ID hashing salt (default ./user_hash_salt.key)
-  TARGET_LANGUAGE    Language name injected into the extraction prompt (default zh)
-  TS_UTC_OFFSET_HOURS  UTC offset for tz-less display timestamps (default 8)
+  TARGET_LANGUAGE    Language name injected into the extraction prompt (default en)
+  TS_UTC_OFFSET_HOURS  UTC offset for tz-less display timestamps (default 0)
   LLM_PROVIDER       LLM CLI provider (default nous)
   LLM_MODEL          LLM CLI model (default xiaomi/mimo-v2.5)
   CONCURRENCY        Parallel chunk extractions (default 4)
@@ -30,7 +30,7 @@ from pathlib import Path
 CHAT_JSONL = Path(os.environ.get("CHAT_JSONL", "./data/pages.jsonl"))
 OUT_DIR = Path(os.environ.get("OUT_DIR", "./out/stream_c"))
 
-TARGET_LANGUAGE = os.environ.get("TARGET_LANGUAGE", "zh")
+TARGET_LANGUAGE = os.environ.get("TARGET_LANGUAGE", "en")
 TARGET_LANGUAGE_NAME = {"zh": "Chinese", "en": "English"}.get(
     TARGET_LANGUAGE, TARGET_LANGUAGE
 )
@@ -39,7 +39,7 @@ SALT_FILE = Path(os.environ.get("SALT_FILE", "./user_hash_salt.key"))
 SALT = SALT_FILE.read_text().strip() if SALT_FILE.exists() else "default-salt"
 
 DISPLAY_TS_TZ = timezone(
-    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
+    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "0")))
 )
 
 CONCURRENCY = int(os.environ.get("CONCURRENCY", "4"))

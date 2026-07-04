@@ -1402,22 +1402,22 @@ def main() -> int:
     parser.add_argument(
         "--target-language",
         type=str,
-        default="zh",
+        default="none",
         help="Language code to treat as the 'target' cohort for classification "
         "(see languages.py LANGUAGE_PROFILES for the full list: zh, ja, ko, "
         "ru, ar, he, th, vi, es, fr, de, pt, id, ...). "
-        "Pass 'none' to disable language classification entirely — every "
+        "Pass 'none' (default) to disable language classification entirely — every "
         "message counts as target (useful for already-monolingual exports). "
-        "Default: zh (one fully-worked example).",
+        "Set to a language code to enable the target/other/mixed cohort split.",
     )
     parser.add_argument(
         "--region",
         type=str,
-        default="cn",
-        help="Region code controlling shadow-community platforms and the "
+        default="global",
+        help="Region code controlling external-community platforms and the "
         "timezone-proxy location buckets (see languages.py REGION_PROFILES: "
         "cn, jp, kr, ru, latam, mena, global, ...). Unknown codes fall back "
-        "to 'global'. Default: cn (backward-compatible).",
+        "to 'global'. Default: global.",
     )
     parser.add_argument(
         "--template",

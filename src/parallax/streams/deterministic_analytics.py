@@ -47,7 +47,7 @@ def hash_user(label):
 # original worked example; set TS_UTC_OFFSET_HOURS to your
 # own export's local timezone offset (e.g. 9 for Japan/Korea, 0 for UTC).
 DISPLAY_TS_TZ = timezone(
-    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "8")))
+    timedelta(hours=float(os.environ.get("TS_UTC_OFFSET_HOURS", "0")))
 )
 
 

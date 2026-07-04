@@ -19,7 +19,7 @@ Multi-language and multi-region out of the box — pick your target market with 
 
 ```bash
 pip install parallax
-parallax init my-project --platform discord --language ja --region jp
+parallax init my-project --platform discord
 cd my-project
 # place your export in data/, then:
 parallax-analyze --input data/export.json --platform discord --out out/ -v
@@ -38,12 +38,12 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 
 # Run:
 parallax-analyze --input ~/Downloads/discord_export.json --platform discord \
-    --target-language ja --region jp --out ./out -v
+    --out ./out -v
 
 # Optional: LLM topic tagging + cross-tabulations
 parallax-topics --input-chat ~/Downloads/discord_export.json --platform discord \
-    --target-language ja --out ./out/topics.json
-parallax-crosstabs --users-json ./out/users.json --region jp --out ./out/crosstabs.json
+    --out ./out/topics.json
+parallax-crosstabs --users-json ./out/users.json --out ./out/crosstabs.json
 ```
 
 > **First install is slow** (~1–2 GB for `sentence-transformers` / `faiss-cpu` / `torch`). This is expected.
@@ -103,16 +103,16 @@ python -m parallax.streams.post_analysis
 
 | `--target-language` | Language | Detection | `--region` | Region |
 |---|---|---|---|---|
-| `zh` (default) | Chinese | CJK script ratio | `cn` (default) | Greater China |
+| `none` (default) | — | Disables language split | `global` (default) | Global/English-default |
+| `zh` | Chinese | CJK script ratio | `cn` | Greater China |
 | `ja` | Japanese | Hiragana/Katakana + CJK | `jp` | Japan |
 | `ko` | Korean | Hangul script ratio | `kr` | Korea |
 | `ru` | Russian | Cyrillic script ratio | `ru` | Russia/CIS |
 | `ar` | Arabic | Arabic script ratio | `latam` | Latin America |
 | `he` | Hebrew | Hebrew script ratio | `mena` | Middle East/N. Africa |
-| `th` | Thai | Thai script ratio | `global` | Global/English-default |
+| `th` | Thai | Thai script ratio | | |
 | `vi` | Vietnamese | Vietnamese-diacritic | | |
 | `es` `fr` `de` `pt` `id` | Latin-script | Stopword-frequency (lower precision) | | |
-| `none` | — | Disables language split | | |
 
 Add your own market by adding one entry to [`src/parallax/core/languages.py`](src/parallax/core/languages.py) — no code changes elsewhere.
 
@@ -125,8 +125,8 @@ All stream scripts read from environment variables — no hardcoded paths to edi
 | `CHAT_JSONL` | Path to raw NDJSON export | `./data/pages.jsonl` |
 | `OUT_DIR` | Output directory for all streams | `./out` |
 | `SALT_FILE` | User-ID hashing salt | `./user_hash_salt.key` |
-| `TARGET_LANGUAGE` | Which query set + LLM prompt language | `zh` |
-| `TS_UTC_OFFSET_HOURS` | UTC offset for tz-less display timestamps | `8` (CST) |
+| `TARGET_LANGUAGE` | Which query set + LLM prompt language | `en` |
+| `TS_UTC_OFFSET_HOURS` | UTC offset for tz-less display timestamps | `0` (UTC) |
 | `GROUND_TRUTH_HUMANS` / `GROUND_TRUTH_BOTS` | Manually-verified live membership | `0` |
 | `LLM_PROVIDER` / `LLM_MODEL` / `LLM_MODEL_PRO` | LLM CLI provider/model | example defaults |
 | `COMMUNITY_NAME` / `CORPUS_DESCRIPTION` / `GROUND_TRUTH_SUMMARY` | Context for synthesis prompt | generic |
