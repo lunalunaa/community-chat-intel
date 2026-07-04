@@ -1,0 +1,38 @@
+# Template: AI product / agent community
+# Use this as a starting point for communities discussing an AI product.
+# Copy to keywords.py (or load via your own mechanism) and customize.
+
+keywords:
+  mentions:
+    openai: ["openai", "chatgpt", "gpt-4"]
+    anthropic: ["anthropic", "claude"]
+    local_llm: ["ollama", "llama", "mistral"]
+
+  alternatives:
+    competitor_a: ["competitor-a", "competitor a"]
+    competitor_b: ["competitor-b", "competitor b"]
+
+  platforms:
+    slack: ["slack"]
+    discord: ["discord"]
+    teams: ["microsoft teams", "teams"]
+
+  topics:
+    api: ["api", "sdk", "integration"]
+    pricing: ["pricing", "cost", "plan"]
+    features: ["features", "capability"]
+
+  pain_points:
+    errors: ["error", "crash", "broken"]
+    slow: ["slow", "latency", "timeout"]
+    confused: ["how", "what", "why", "confused"]
+
+  setup:
+    docker: ["docker", "container"]
+    pip: ["pip install", "npm install"]
+    cli: ["cli", "command line"]
+
+  discovery:
+    blog: ["blog", "article"]
+    friend: ["friend", "recommended"]
+    conference: ["conference", "meetup"]

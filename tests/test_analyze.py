@@ -47,14 +47,14 @@ class TestExtractUrls:
 
 class TestClassifyUrl:
     def test_official_domain(self):
-        cat, domain = analyze.classify_url("https://example.com/docs")
+        cat, domain = analyze.classify_url("https://rust-lang.org/docs")
         assert cat == "official"
-        assert "example.com" in domain
+        assert "rust-lang.org" in domain
 
     def test_impersonator_domain(self):
-        cat, domain = analyze.classify_url("https://example-product.org.cn")
+        cat, domain = analyze.classify_url("https://rust-lang.com/fake")
         assert cat == "impersonator"
-        assert "example-product.org.cn" in domain
+        assert "rust-lang.com" in domain
 
     def test_huggingface(self):
         cat, domain = analyze.classify_url("https://huggingface.co/model")
@@ -73,7 +73,7 @@ class TestClassifyUrl:
         assert cat == "other"
 
     def test_case_insensitive(self):
-        cat, domain = analyze.classify_url("HTTPS://EXAMPLE.COM/Page")
+        cat, domain = analyze.classify_url("HTTPS://RUST-LANG.ORG/Page")
         assert cat == "official"
 
 

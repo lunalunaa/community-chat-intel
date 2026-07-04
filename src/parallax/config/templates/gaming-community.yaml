@@ -1,0 +1,35 @@
+# Template: Gaming community
+# Use this for communities around a game or gaming platform.
+
+keywords:
+  mentions:
+    game_engine: ["unity", "unreal", "godot"]
+    modding: ["mod", "modding", "plugin"]
+    server: ["server", "hosting", "dedicated"]
+
+  alternatives:
+    other_games: ["competitor game", "other game"]
+    other_platforms: ["steam", "epic", "playstation", "xbox"]
+
+  platforms:
+    discord: ["discord"]
+    reddit: ["reddit"]
+    youtube: ["youtube", "yt"]
+    twitch: ["twitch", "stream"]
+
+  topics:
+    gameplay: ["gameplay", "mechanics", "balance"]
+    graphics: ["graphics", "fps", "performance", "rendering"]
+    multiplayer: ["multiplayer", "coop", "pvp", "raid"]
+    updates: ["update", "patch", "changelog", "dlc"]
+
+  pain_points:
+    bugs: ["bug", "glitch", "broken", "crash"]
+    performance: ["lag", "stutter", "fps drop", "slow"]
+    balance: ["overpowered", "op", "nerf", "buff", "unfair"]
+    matchmaking: ["matchmaking", "queue", "wait time"]
+
+  setup:
+    steam: ["steam", "steam install"]
+    launcher: ["launcher", "client"]
+    console: ["console", "playstation", "xbox"]

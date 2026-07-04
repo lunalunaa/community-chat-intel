@@ -19,16 +19,16 @@ def _make_discord_export(messages_data: list[dict]) -> dict:
 def _make_messages(n: int = 20) -> list[dict]:
     """Generate n synthetic messages with varied content."""
     templates = [
-        ("怎么安装这个？deepseek报错了", "2026-01-01T12:00:00+00:00"),
-        ("I got an error with openai api key", "2026-01-01T13:00:00+00:00"),
-        ("how to use skills memory cron", "2026-01-02T09:00:00+00:00"),
-        ("this product is too expensive", "2026-01-03T14:00:00+00:00"),
-        ("feishu adapter demand is high", "2026-01-04T10:00:00+00:00"),
-        ("claude code is better than this", "2026-01-05T11:00:00+00:00"),
-        ("can someone share an api key", "2026-01-06T15:00:00+00:00"),
-        ("built a bot with skills and cron", "2026-01-07T16:00:00+00:00"),
-        ("wsl docker install fails", "2026-01-08T08:00:00+00:00"),
-        ("this is the official site right?", "2026-01-09T17:00:00+00:00"),
+        ("how to install rustup on macOS", "2026-01-01T12:00:00+00:00"),
+        ("getting a borrow checker error with my struct", "2026-01-01T13:00:00+00:00"),
+        ("how to use cargo and rustup together", "2026-01-02T09:00:00+00:00"),
+        ("cargo build is so slow, any tips", "2026-01-03T14:00:00+00:00"),
+        ("discord is where I found help for rust", "2026-01-04T10:00:00+00:00"),
+        ("go is simpler than rust for most things", "2026-01-05T11:00:00+00:00"),
+        ("can someone explain lifetimes to me", "2026-01-06T15:00:00+00:00"),
+        ("built a web server with axum and tokio", "2026-01-07T16:00:00+00:00"),
+        ("wsl docker install fails for cargo", "2026-01-08T08:00:00+00:00"),
+        ("is rust-lang.org the official site?", "2026-01-09T17:00:00+00:00"),
     ]
     msgs = []
     for i in range(n):
@@ -118,9 +118,7 @@ class TestPipelineEndToEnd:
         """Verify provider mentions are detected."""
         _, stats = _run_on_discord_export(tmp_path, _make_messages(20))
 
-        assert "openai" in stats["providers"]
-        # deepseek may or may not appear depending on language classification
-        # of the message containing it — just assert at least 1 provider
+        assert "cargo" in stats["providers"]
         assert len(stats["providers"]) >= 1
 
     def test_pipeline_detects_friction(self, tmp_path):
@@ -136,14 +134,15 @@ class TestPipelineEndToEnd:
         """Verify feature mentions are detected."""
         _, stats = _run_on_discord_export(tmp_path, _make_messages(20))
 
-        assert "skills" in stats["features"]
-        assert "cron" in stats["features"]
+        assert (
+            "borrow_checker" in stats["features"] or "async_await" in stats["features"]
+        )
 
     def test_pipeline_detects_messaging(self, tmp_path):
         """Verify messaging platform mentions are detected."""
         _, stats = _run_on_discord_export(tmp_path, _make_messages(20))
 
-        assert "feishu_lark" in stats["messaging_platforms"]
+        assert "discord" in stats["messaging_platforms"]
 
     def test_salt_is_generated(self, tmp_path):
         """Salt file should be auto-generated on first run."""

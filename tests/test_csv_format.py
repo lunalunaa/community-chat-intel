@@ -15,7 +15,7 @@ def _make_discord_export(n: int = 10) -> dict:
                 "id": str(i + 1),
                 "author": {"id": f"u{i % 3}", "name": f"user_{i % 3}"},
                 "timestamp": f"2026-01-{i + 1:02d}T12:00:00+00:00",
-                "content": "how to use openai api key deepseek error",
+                "content": "how to use cargo and rustup for borrow checker error",
                 "reactions": [],
                 "attachments": [],
             }
@@ -110,4 +110,4 @@ class TestStatsCSVExport:
 
         provider_rows = [r for r in rows if r[0] == "providers"]
         assert len(provider_rows) >= 1
-        assert any(r[1] == "openai" for r in provider_rows)
+        assert any(r[1] == "cargo" for r in provider_rows)

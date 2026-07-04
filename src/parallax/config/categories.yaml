@@ -1,0 +1,53 @@
+# Category labels for the parallax dashboard and report.
+#
+# These names appear as section headers in the dashboard and report.
+# Override by editing this file (set PARALLAX_CONFIG_DIR to your copy).
+#
+# Keys must match the stats keys in analyze.py output. The defaults below
+# use generic labels that work for any community type.
+
+# Map from stats key → display label
+labels:
+  # Generic keys (future)
+  mentions: "Top mentions"
+  alternatives: "Alternatives"
+  platforms: "Platforms"
+  topics: "Topic mentions"
+  pain_points: "Pain points"
+  setup: "Setup methods"
+  discovery: "Discovery channels"
+  external: "External communities"
+  timezone: "Timezone distribution"
+  # Legacy key aliases (current analyze.py output)
+  providers: "Top mentions"
+  competitors: "Alternatives"
+  messaging_platforms: "Platforms"
+  features: "Topic mentions"
+  friction_signals: "Pain points"
+  install_paths: "Setup methods"
+  acquisition_channels: "Discovery channels"
+  shadow_community_mentions: "External communities"
+  location_proxy: "Timezone distribution"
+  language_distribution: "Language distribution"
+  retention: "Retention"
+
+# Bar colors per category (CSS class names)
+colors:
+  mentions: "accent"
+  providers: "accent"
+  alternatives: "yellow"
+  competitors: "yellow"
+  platforms: "cyan"
+  messaging_platforms: "cyan"
+  topics: "accent"
+  features: "accent"
+  pain_points: "red"
+  friction_signals: "red"
+  setup: "cyan"
+  install_paths: "cyan"
+  discovery: "pink"
+  acquisition_channels: "pink"
+  external: "pink"
+  shadow_community_mentions: "pink"
+  timezone: "orange"
+  location_proxy: "orange"

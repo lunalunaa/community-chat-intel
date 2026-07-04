@@ -1,0 +1,39 @@
+# Template: Programming language community
+# Use this for communities around a programming language or framework.
+
+keywords:
+  mentions:
+    cargo: ["cargo"]
+    rustup: ["rustup"]
+    rust_analyzer: ["rust-analyzer", "rust analyzer"]
+    clippy: ["clippy"]
+    package_manager: ["package manager"]
+
+  alternatives:
+    go: ["golang", "go"]
+    python: ["python"]
+    cpp: ["c++", "cpp"]
+    zig: ["zig"]
+
+  platforms:
+    discord: ["discord"]
+    zulip: ["zulip"]
+    reddit: ["reddit"]
+    github: ["github discussions", "github issues"]
+
+  topics:
+    compiler: ["compiler", "borrow checker", "type system"]
+    async: ["async", "await", "runtime"]
+    memory: ["ownership", "lifetimes", "unsafe"]
+    macros: ["macros", "proc-macro"]
+
+  pain_points:
+    compile_time: ["slow compile", "compile time", "build time"]
+    borrow_checker: ["borrow checker", "fighting the borrow"]
+    errors: ["error", "fail", "broken"]
+    docs: ["documentation", "no docs", "unclear docs"]
+
+  setup:
+    installer: ["install", "setup"]
+    docker: ["docker"]
+    from_source: ["from source", "build from source"]

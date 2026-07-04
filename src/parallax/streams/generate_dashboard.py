@@ -242,8 +242,17 @@ const RUNS = __RUNS_JSON__;
 const USERS = __USERS_JSON__;
 const MESSAGES = __MESSAGES_JSON__;
 const KEYWORD_TERMS = __KEYWORD_TERMS__;
+const LABELS = __LABELS_JSON__;
+const COLORS = __COLORS_JSON__;
 const HAS_TREND = __HAS_TREND__;
 const HAS_DRILLDOWN = __HAS_DRILLDOWN__;
+
+// Category order for display (auto-discovers from stats)
+var CATEGORY_ORDER = [
+  'providers', 'messaging_platforms', 'language_distribution',
+  'friction_signals', 'features', 'install_paths',
+  'shadow_community_mentions', 'location_proxy', 'competitors'
+];
 
 let currentRunIdx = RUNS.length - 1;
 let currentCohort = 'all';
@@ -471,44 +480,95 @@ function renderKPIs() {
 function renderSections() {
   var meta = getMeta();
   var retention = get('retention') || {};
-  var competitors = get('competitors') || {};
-  var competitorsHtml = Object.keys(competitors).length > 0 ?
-    '<div class="card span-4"><h2>Competitor mentions</h2><div class="card-body"><div class="bar-list" id="bar-competitors"></div></div></div>' : '';
 
-  document.getElementById('sections').innerHTML =
-    '<div class="bento">' +
-    '<div class="card span-2"><h2>Provider mentions</h2><div class="card-body"><div class="bar-list" id="bar-providers"></div></div></div>' +
-    '<div class="card"><h2>Messaging platforms</h2><div class="card-body"><div class="bar-list" id="bar-messaging"></div></div></div>' +
-    '<div class="card"><h2>Language distribution</h2><div class="card-body"><div class="bar-list" id="bar-language"></div></div></div>' +
-    '</div>' +
-    '<div class="bento">' +
-    '<div class="card glow-red"><h2>Friction signals</h2><div class="card-body"><div class="bar-list" id="bar-friction"></div></div></div>' +
-    '<div class="card glow-green"><h2>Feature usage</h2><div class="card-body"><div class="bar-list" id="bar-features"></div></div></div>' +
-    '<div class="card span-2"><h2>Retention \u2014 target-language cohort</h2><div class="card-body"><table>' +
-    '<tr><td>Active (30d)</td><td class="num"><span class="badge green">' + (retention.target_active_30d || 0) + '</span></td></tr>' +
-    '<tr><td>Lapsed (30\u201390d)</td><td class="num"><span class="badge yellow">' + (retention.target_lapsed_30_90d || 0) + '</span></td></tr>' +
-    '<tr><td>Lapsed (90d+)</td><td class="num"><span class="badge red">' + (retention.target_lapsed_90d_plus || 0) + '</span></td></tr>' +
-    '<tr><td>One-time posters</td><td class="num"><span class="badge dim">' + (retention.target_one_time_posters || 0) + '</span></td></tr>' +
-    '</table></div></div>' +
-    '</div>' +
-    '<div class="bento">' +
-    '<div class="card"><h2>Install paths</h2><div class="card-body"><div class="bar-list" id="bar-install"></div></div></div>' +
-    '<div class="card"><h2>Shadow communities</h2><div class="card-body"><div class="bar-list" id="bar-shadow"></div></div></div>' +
-    '<div class="card"><h2>URL categories</h2><div class="card-body"><div class="bar-list" id="bar-urls"></div></div></div>' +
-    '<div class="card"><h2>Location proxy</h2><div class="card-body"><div class="bar-list" id="bar-location"></div></div></div>' +
-    '</div>' +
-    '<div class="bento">' + competitorsHtml + '</div>';
+  // Helper to get display label for a category
+  function catLabel(key) {
+    return LABELS[key] || key.replace(/_/g, ' ').replace(/\\b\\w/g, function(c) { return c.toUpperCase(); });
+  }
+  function catColor(key) {
+    return COLORS[key] || 'accent';
+  }
 
-  barList('bar-providers', get('providers'), 'accent', 'providers');
-  barList('bar-messaging', get('messaging_platforms'), 'cyan', 'messaging_platforms');
-  barList('bar-language', get('language_distribution'), 'green', 'language_distribution');
-  barList('bar-location', get('location_proxy'), 'orange', 'location_proxy');
-  barList('bar-friction', get('friction_signals'), 'red', 'friction_signals');
-  barList('bar-features', get('features'), 'accent', 'features');
-  barList('bar-install', get('install_paths'), 'cyan', 'install_paths');
-  barList('bar-shadow', get('shadow_community_mentions'), 'pink', 'shadow_community_mentions');
-  barList('bar-urls', (get('urls') || {}).category_counts || {}, 'orange', 'urls');
-  if (document.getElementById('bar-competitors')) barList('bar-competitors', competitors, 'yellow', 'competitors');
+  // Auto-discover which categories have data in this run
+  var dataCats = [];
+  CATEGORY_ORDER.forEach(function(key) {
+    if (key === 'language_distribution') return; // handled separately
+    var data = get(key);
+    if (data && Object.keys(data).length > 0) dataCats.push(key);
+  });
+
+  // Also check urls.category_counts
+  var urlCats = (get('urls') || {}).category_counts || {};
+  if (Object.keys(urlCats).length > 0) dataCats.push('urls');
+
+  // Build bento grid: 2-column rows, first card spans 2
+  var html = '';
+  var bentoRows = [];
+
+  // Row 1: first two categories (first one spans 2)
+  if (dataCats.length >= 1) {
+    var row = [];
+    row.push({cat: dataCats[0], span: 2});
+    if (dataCats.length >= 2) row.push({cat: dataCats[1], span: 1});
+    if (dataCats.length >= 3) row.push({cat: dataCats[2], span: 1});
+    bentoRows.push(row);
+  }
+  // Row 2: pain points + topics + retention
+  var row2 = [];
+  if (dataCats.indexOf('friction_signals') >= 0) row2.push({cat: 'friction_signals', span: 1, glow: 'red'});
+  if (dataCats.indexOf('features') >= 0) row2.push({cat: 'features', span: 1, glow: 'green'});
+  // Retention is always shown
+  row2.push({cat: '__retention__', span: 2});
+  if (row2.length > 1) bentoRows.push(row2);
+
+  // Row 3: remaining categories
+  var row3Cats = dataCats.filter(function(c) {
+    return dataCats.indexOf(c) >= 3 && c !== 'friction_signals' && c !== 'features';
+  });
+  if (row3Cats.length > 0) {
+    var row3 = row3Cats.map(function(c) { return {cat: c, span: 1}; });
+    bentoRows.push(row3);
+  }
+
+  // Render bento rows
+  bentoRows.forEach(function(row) {
+    html += '<div class="bento">';
+    row.forEach(function(item) {
+      if (item.cat === '__retention__') {
+        html += '<div class="card span-2"><h2>' + catLabel('retention') + '</h2><div class="card-body"><table>' +
+          '<tr><td>Active (30d)</td><td class="num"><span class="badge green">' + (retention.target_active_30d || 0) + '</span></td></tr>' +
+          '<tr><td>Lapsed (30\u201390d)</td><td class="num"><span class="badge yellow">' + (retention.target_lapsed_30_90d || 0) + '</span></td></tr>' +
+          '<tr><td>Lapsed (90d+)</td><td class="num"><span class="badge red">' + (retention.target_lapsed_90d_plus || 0) + '</span></td></tr>' +
+          '<tr><td>One-time posters</td><td class="num"><span class="badge dim">' + (retention.target_one_time_posters || 0) + '</span></td></tr>' +
+          '</table></div></div>';
+      } else {
+        var glowClass = item.glow ? ' glow-' + item.glow : '';
+        var spanClass = item.span === 2 ? ' span-2' : '';
+        html += '<div class="card' + glowClass + spanClass + '"><h2>' + catLabel(item.cat) + '</h2><div class="card-body"><div class="bar-list" id="bar-' + item.cat + '"></div></div></div>';
+      }
+    });
+    html += '</div>';
+  });
+
+  // Language distribution always shown as its own row
+  var langDist = get('language_distribution') || {};
+  if (Object.keys(langDist).length > 0) {
+    html = '<div class="bento"><div class="card"><h2>' + catLabel('language_distribution') + '</h2><div class="card-body"><div class="bar-list" id="bar-language_distribution"></div></div></div></div>' + html;
+  }
+
+  document.getElementById('sections').innerHTML = html;
+
+  // Render bar lists for all discovered categories
+  dataCats.forEach(function(key) {
+    var elId = 'bar-' + key;
+    if (document.getElementById(elId)) {
+      var data = key === 'urls' ? urlCats : get(key);
+      barList(elId, data, catColor(key), key);
+    }
+  });
+  if (document.getElementById('bar-language_distribution')) {
+    barList('bar-language_distribution', langDist, 'green', 'language_distribution');
+  }
 }
 
 // --- SVG Trend chart ---
@@ -794,11 +854,78 @@ def generate_dashboard(
 
     keyword_terms_json = json.dumps(keyword_terms, ensure_ascii=False)
 
+    # Load category labels from config (or use defaults)
+    category_labels: dict[str, str] = {}
+    category_colors: dict[str, str] = {}
+    try:
+        from parallax.core.config import _config_dir
+
+        labels_path = _config_dir() / "categories.yaml"
+        if labels_path.exists():
+            import yaml
+
+            cat_data = yaml.safe_load(labels_path.read_text())
+            category_labels = cat_data.get("labels", {})
+            category_colors = cat_data.get("colors", {})
+    except Exception:
+        pass
+
+    # Defaults if config not available — generic labels for both new and legacy keys
+    if not category_labels:
+        category_labels = {
+            "mentions": "Top mentions",
+            "providers": "Top mentions",
+            "alternatives": "Alternatives",
+            "competitors": "Alternatives",
+            "platforms": "Platforms",
+            "messaging_platforms": "Platforms",
+            "topics": "Topic mentions",
+            "features": "Topic mentions",
+            "pain_points": "Pain points",
+            "friction_signals": "Pain points",
+            "setup": "Setup methods",
+            "install_paths": "Setup methods",
+            "discovery": "Discovery channels",
+            "acquisition_channels": "Discovery channels",
+            "external": "External communities",
+            "shadow_community_mentions": "External communities",
+            "timezone": "Timezone distribution",
+            "location_proxy": "Timezone distribution",
+            "language_distribution": "Language distribution",
+            "retention": "Retention",
+        }
+    if not category_colors:
+        category_colors = {
+            "mentions": "accent",
+            "providers": "accent",
+            "alternatives": "yellow",
+            "competitors": "yellow",
+            "platforms": "cyan",
+            "messaging_platforms": "cyan",
+            "topics": "accent",
+            "features": "accent",
+            "pain_points": "red",
+            "friction_signals": "red",
+            "setup": "cyan",
+            "install_paths": "cyan",
+            "discovery": "pink",
+            "acquisition_channels": "pink",
+            "external": "pink",
+            "shadow_community_mentions": "pink",
+            "timezone": "orange",
+            "location_proxy": "orange",
+        }
+
+    labels_json = json.dumps(category_labels, ensure_ascii=False)
+    colors_json = json.dumps(category_colors, ensure_ascii=False)
+
     # Replace placeholders in JS
     js = _JS.replace("__RUNS_JSON__", runs_json)
     js = js.replace("__USERS_JSON__", users_json)
     js = js.replace("__MESSAGES_JSON__", messages_json)
     js = js.replace("__KEYWORD_TERMS__", keyword_terms_json)
+    js = js.replace("__LABELS_JSON__", labels_json)
+    js = js.replace("__COLORS_JSON__", colors_json)
     js = js.replace("__HAS_TREND__", "true" if has_trend else "false")
     js = js.replace("__HAS_DRILLDOWN__", "true" if has_drilldown else "false")
 
