@@ -241,6 +241,7 @@ _JS = """
 const RUNS = __RUNS_JSON__;
 const USERS = __USERS_JSON__;
 const MESSAGES = __MESSAGES_JSON__;
+const KEYWORD_TERMS = __KEYWORD_TERMS__;
 const HAS_TREND = __HAS_TREND__;
 const HAS_DRILLDOWN = __HAS_DRILLDOWN__;
 
@@ -383,30 +384,29 @@ function toggleDrilldown(barItem, dataKey, label) {
   }
 
   // Build search terms from the label — strip common suffixes and try
-  // the label parts, plus category-specific search terms
+  // the label parts, plus keyword-dict-derived search terms
   var searchTerms = [];
   var labelLower = label.toLowerCase();
   var labelParts = labelLower.split(/[\\s_-]+/);
   searchTerms = labelParts.filter(function(p) { return p.length >= 3; });
 
-  // Category-specific search terms for labels that don't appear verbatim in messages
-  var categoryTerms = {
-    'confused': ['?', 'how', 'what', 'why', '怎么', '如何', '为什么', '什么'],
-    'error_generic': ['error', '报错', '错误', 'fail', 'broken', 'crash', 'bug'],
-    'key_issue': ['key', 'api key', 'sk-', 'token', '密码', '密钥'],
-    'install_difficult': ['install', '安装', 'setup', '部署', '配置'],
-    'pricing_concern': ['expensive', 'price', 'cost', '贵', '费用', '免费', '额度'],
-    'other': ['the', 'this', 'it', 'is', 'a'],
-    'mixed': ['the', 'this', 'it'],
-    'target': ['the', 'this', 'it'],
-    'unknown': ['the', 'this', 'it'],
-  };
-  if (categoryTerms[labelLower]) {
-    searchTerms = searchTerms.concat(categoryTerms[labelLower]);
+  // Use keyword terms derived from keywords.py at generation time
+  // (injected as KEYWORD_TERMS — no locale-specific hardcoding in JS)
+  if (KEYWORD_TERMS[labelLower]) {
+    searchTerms = searchTerms.concat(KEYWORD_TERMS[labelLower]);
   }
-  // For dataKey-based searches (e.g. friction_signals), also add the dataKey context
-  if (dataKey === 'friction_signals' && !categoryTerms[labelLower]) {
-    searchTerms = searchTerms.concat(['error', 'problem', 'issue', 'help', 'broken']);
+  // Fallback: for labels without keyword mappings, add generic terms
+  if (searchTerms.length === 0 || (searchTerms.length <= 1 && dataKey !== 'providers' && dataKey !== 'messaging_platforms')) {
+    // Language distribution labels and other generic buckets
+    var fallbackTerms = {
+      'other': ['the', 'this', 'it', 'is', 'a'],
+      'mixed': ['the', 'this', 'it'],
+      'target': ['the', 'this', 'it'],
+      'unknown': ['the', 'this', 'it'],
+    };
+    if (fallbackTerms[labelLower]) {
+      searchTerms = searchTerms.concat(fallbackTerms[labelLower]);
+    }
   }
 
   // Deduplicate
@@ -753,10 +753,52 @@ def generate_dashboard(
             '<button id="btn-trend" onclick="setView(\'trend\')">Trend</button>'
         )
 
+    # Build keyword search terms for drill-down from keywords.py
+    # This maps each label to the actual text patterns that triggered it,
+    # so the drill-down can find matching messages without hardcoding
+    # locale-specific terms in the JS.
+    keyword_terms: dict[str, list[str]] = {}
+    try:
+        from parallax.core import keywords as kw
+
+        for source_dict, prefix in [
+            (kw.PROVIDERS, ""),
+            (kw.COMPETITORS, ""),
+            (kw.MESSAGING, ""),
+            (kw.PRODUCT_FEATURES, ""),
+            (kw.FRICTION, ""),
+            (kw.INSTALL, ""),
+            (kw.ACQUISITION, ""),
+        ]:
+            for label, patterns in source_dict.items():
+                # Extract plain-text search terms from regex patterns
+                # (strip \b, \w, anchors, etc.)
+                terms = []
+                for pat in patterns:
+                    clean = (
+                        pat.replace("\\b", "").replace("\\w", "").replace("\\s", " ")
+                    )
+                    clean = (
+                        clean.replace("[", "")
+                        .replace("]", "")
+                        .replace("^", "")
+                        .replace("$", "")
+                    )
+                    clean = clean.strip()
+                    if len(clean) >= 2 and not clean.startswith("\\"):
+                        terms.append(clean.lower())
+                if terms:
+                    keyword_terms[label] = terms
+    except Exception:
+        pass
+
+    keyword_terms_json = json.dumps(keyword_terms, ensure_ascii=False)
+
     # Replace placeholders in JS
     js = _JS.replace("__RUNS_JSON__", runs_json)
     js = js.replace("__USERS_JSON__", users_json)
     js = js.replace("__MESSAGES_JSON__", messages_json)
+    js = js.replace("__KEYWORD_TERMS__", keyword_terms_json)
     js = js.replace("__HAS_TREND__", "true" if has_trend else "false")
     js = js.replace("__HAS_DRILLDOWN__", "true" if has_drilldown else "false")
 
