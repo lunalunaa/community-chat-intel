@@ -381,12 +381,47 @@ function toggleDrilldown(barItem, dataKey, label) {
     dd.innerHTML = '<div class="no-data">No message data available. Pass --chat to enable drill-down.</div>';
     return;
   }
+
+  // Build search terms from the label — strip common suffixes and try
+  // the label parts, plus category-specific search terms
+  var searchTerms = [];
   var labelLower = label.toLowerCase();
   var labelParts = labelLower.split(/[\\s_-]+/);
+  searchTerms = labelParts.filter(function(p) { return p.length >= 3; });
+
+  // Category-specific search terms for labels that don't appear verbatim in messages
+  var categoryTerms = {
+    'confused': ['?', 'how', 'what', 'why', '怎么', '如何', '为什么', '什么'],
+    'error_generic': ['error', '报错', '错误', 'fail', 'broken', 'crash', 'bug'],
+    'key_issue': ['key', 'api key', 'sk-', 'token', '密码', '密钥'],
+    'install_difficult': ['install', '安装', 'setup', '部署', '配置'],
+    'pricing_concern': ['expensive', 'price', 'cost', '贵', '费用', '免费', '额度'],
+    'other': ['the', 'this', 'it', 'is', 'a'],
+    'mixed': ['the', 'this', 'it'],
+    'target': ['the', 'this', 'it'],
+    'unknown': ['the', 'this', 'it'],
+  };
+  if (categoryTerms[labelLower]) {
+    searchTerms = searchTerms.concat(categoryTerms[labelLower]);
+  }
+  // For dataKey-based searches (e.g. friction_signals), also add the dataKey context
+  if (dataKey === 'friction_signals' && !categoryTerms[labelLower]) {
+    searchTerms = searchTerms.concat(['error', 'problem', 'issue', 'help', 'broken']);
+  }
+
+  // Deduplicate
+  searchTerms = searchTerms.filter(function(v, i, a) { return a.indexOf(v) === i; });
+
   var matches = MESSAGES.filter(function(m) {
     var c = (m.content || '').toLowerCase();
-    return labelParts.some(function(part) { return part.length >= 3 && c.includes(part); });
+    return searchTerms.some(function(term) {
+      if (term.length >= 3) return c.includes(term);
+      // For short terms (like '?'), use more careful matching
+      if (term === '?') return c.includes('?');
+      return c.includes(' ' + term + ' ') || c.startsWith(term + ' ') || c.endsWith(' ' + term);
+    });
   }).slice(0, 20);
+
   if (matches.length === 0) {
     dd.innerHTML = '<div class="no-data">No messages found matching "' + label + '"</div>';
     return;
