@@ -1459,6 +1459,14 @@ def main() -> int:
     )
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
+        "--format",
+        choices=["json", "csv"],
+        default="json",
+        help="Output format for stats. json (default) writes stats.json. csv writes "
+        "stats.csv with a flat key-value layout suitable for spreadsheet/BI tools. "
+        "Both formats are always written alongside users.json and report.md.",
+    )
+    parser.add_argument(
         "--incremental",
         action="store_true",
         help="Only process new messages since last run. Requires an existing "
@@ -1577,6 +1585,33 @@ def main() -> int:
         json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(f"[write] {stats_path}", file=sys.stderr)
+
+    # Write stats.csv (flat key-value layout for BI tools)
+    if args.format == "csv":
+        import csv
+
+        csv_path = args.out / "stats.csv"
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["category", "key", "value"])
+            for category, data in stats.items():
+                if isinstance(data, dict):
+                    for key, value in data.items():
+                        if isinstance(value, (int, float, str)):
+                            writer.writerow([category, key, value])
+                        elif isinstance(value, dict):
+                            for subkey, subvalue in value.items():
+                                if isinstance(subvalue, (int, float, str)):
+                                    writer.writerow(
+                                        [category, f"{key}.{subkey}", subvalue]
+                                    )
+                        elif isinstance(value, list):
+                            writer.writerow(
+                                [category, key, ",".join(str(v) for v in value)]
+                            )
+                else:
+                    writer.writerow(["root", category, str(data)])
+        print(f"[write] {csv_path}", file=sys.stderr)
 
     # Write users.json (redacted by default)
     users_serializable = {}

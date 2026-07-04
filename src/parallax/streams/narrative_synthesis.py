@@ -10,23 +10,6 @@ from pathlib import Path
 BASE = Path(os.environ.get("OUT_DIR", "./out"))
 OUT = BASE / "findings_final_v2.md"
 
-# ===== Gather inputs =====
-stream_b_findings = json.load((BASE / "stream_b/synthesized_findings.json").open())
-stream_c_summary = json.load((BASE / "stream_c/summary.json").open())
-stream_c_facts = json.load((BASE / "stream_c/aggregated_facts.json").open())
-topics = json.load((BASE / "topics.json").open())
-stream_d_pareto = json.load((BASE / "stream_d/user_pareto_v4.json").open())
-stream_d_stickiness = json.load((BASE / "stream_d/user_stickiness_v4.json").open())
-stream_d_gateway = json.load((BASE / "stream_d/gateway_mix.json").open())
-stream_d_reply = json.load((BASE / "stream_d/reply_graph.json").open())
-stream_d_temporal = json.load((BASE / "stream_d/temporal_growth_v4.json").open())
-stats = json.load((BASE / "stats.json").open())
-
-# Topic distribution
-topic_counts = Counter(topics.values())
-total_tagged = sum(topic_counts.values())
-topic_pcts = {k: (v, round(100 * v / total_tagged, 1)) for k, v in topic_counts.items()}
-
 # Build compact context for the LLM — stay under ~25K chars for safety
 #
 # NOTE: The ground-truth anchors below are EXAMPLE values from a real run
@@ -48,7 +31,28 @@ GROUND_TRUTH_SUMMARY = os.environ.get(
     "  - 3,168 unique join-event names observed in 20 days -> ~49 inferred departures\n",
 )
 
-context = f"""You are synthesizing a multi-stream analysis of a chat community ("{COMMUNITY_NAME}", {CORPUS_DESCRIPTION}).
+
+def main() -> None:
+    # ===== Gather inputs =====
+    stream_b_findings = json.load((BASE / "stream_b/synthesized_findings.json").open())
+    stream_c_summary = json.load((BASE / "stream_c/summary.json").open())
+    stream_c_facts = json.load((BASE / "stream_c/aggregated_facts.json").open())
+    topics = json.load((BASE / "topics.json").open())
+    stream_d_pareto = json.load((BASE / "stream_d/user_pareto_v4.json").open())
+    stream_d_stickiness = json.load((BASE / "stream_d/user_stickiness_v4.json").open())
+    stream_d_gateway = json.load((BASE / "stream_d/gateway_mix.json").open())
+    stream_d_reply = json.load((BASE / "stream_d/reply_graph.json").open())
+    stream_d_temporal = json.load((BASE / "stream_d/temporal_growth_v4.json").open())
+    stats = json.load((BASE / "stats.json").open())
+
+    # Topic distribution
+    topic_counts = Counter(topics.values())
+    total_tagged = sum(topic_counts.values())
+    topic_pcts = {
+        k: (v, round(100 * v / total_tagged, 1)) for k, v in topic_counts.items()
+    }
+
+    context = f"""You are synthesizing a multi-stream analysis of a chat community ("{COMMUNITY_NAME}", {CORPUS_DESCRIPTION}).
 
 CRITICAL GROUND-TRUTH ANCHORS (verified from the platform's admin UI at export time):
 {GROUND_TRUTH_SUMMARY}
@@ -60,37 +64,35 @@ community talks about, with no strategic recommendations layered in at this stag
 
 === STREAM B: SEMANTIC-RETRIEVAL NARRATIVE FINDINGS ({len(stream_b_findings)} queries) ===
 """
-for qname, f in stream_b_findings.items():
-    context += f"\n[{qname}] query: {f['query']}\n{f['analysis'][:900]}\n"
+    for qname, f in stream_b_findings.items():
+        context += f"\n[{qname}] query: {f['query']}\n{f['analysis'][:900]}\n"
 
-context += (
-    "\n\n=== STREAM C: STRUCTURED FACT EXTRACTION (6,571 facts across 244 chunks) ===\n"
-)
-context += json.dumps(stream_c_summary, ensure_ascii=False, indent=1)[:5000]
+    context += "\n\n=== STREAM C: STRUCTURED FACT EXTRACTION (6,571 facts across 244 chunks) ===\n"
+    context += json.dumps(stream_c_summary, ensure_ascii=False, indent=1)[:5000]
 
-# A few exemplar facts per category so MiMo has concrete texture
-import random
+    # A few exemplar facts per category so MiMo has concrete texture
+    import random
 
-random.seed(42)
-context += "\n\nExemplar facts (randomly sampled, truncated):\n"
-for cat, items in stream_c_facts.items():
-    if not items:
-        continue
-    samples = random.sample(items, min(5, len(items)))
-    context += f"\n--- {cat} ---\n"
-    for s in samples:
-        d = {
-            k: (
-                str(v)[:80]
-                if not isinstance(v, list)
-                else ",".join(str(x) for x in v)[:80]
-            )
-            for k, v in s.items()
-            if k != "_chunk_idx"
-        }
-        context += json.dumps(d, ensure_ascii=False) + "\n"
+    random.seed(42)
+    context += "\n\nExemplar facts (randomly sampled, truncated):\n"
+    for cat, items in stream_c_facts.items():
+        if not items:
+            continue
+        samples = random.sample(items, min(5, len(items)))
+        context += f"\n--- {cat} ---\n"
+        for s in samples:
+            d = {
+                k: (
+                    str(v)[:80]
+                    if not isinstance(v, list)
+                    else ",".join(str(x) for x in v)[:80]
+                )
+                for k, v in s.items()
+                if k != "_chunk_idx"
+            }
+            context += json.dumps(d, ensure_ascii=False) + "\n"
 
-context += f"""
+    context += f"""
 
 === STREAM D: QUANTITATIVE MEMBERSHIP/NETWORK ANALYSIS (v4 — ground-truth-anchored) ===
 
@@ -125,14 +127,14 @@ Reply Graph:
 
 Temporal growth (first 5, peak day, last 3):
 """
-peak_join = max(stream_d_temporal, key=lambda x: x["new_members_joined"])
-context += json.dumps(
-    stream_d_temporal[:5] + [peak_join] + stream_d_temporal[-3:],
-    ensure_ascii=False,
-    indent=1,
-)
+    peak_join = max(stream_d_temporal, key=lambda x: x["new_members_joined"])
+    context += json.dumps(
+        stream_d_temporal[:5] + [peak_join] + stream_d_temporal[-3:],
+        ensure_ascii=False,
+        indent=1,
+    )
 
-context += f"""
+    context += f"""
 
 === AGGREGATE STATS FROM ORIGINAL PIPELINE ===
 - Total messages: {stats["metadata"]["total_messages"]:,}
@@ -168,39 +170,43 @@ Rules:
 - Output markdown only. No preamble like "Here is the writeup".
 """
 
-print(f"Context size: {len(context):,} chars", flush=True)
+    print(f"Context size: {len(context):,} chars", flush=True)
 
-# Call the configured LLM (pro/stronger variant recommended for this step)
-cmd = [
-    "hermes",
-    "chat",
-    "-q",
-    context,
-    "--quiet",
-    "--ignore-rules",
-    "--ignore-user-config",
-    "--max-turns",
-    "1",
-    "--source",
-    "tool",
-    "--provider",
-    os.environ.get("LLM_PROVIDER", "nous"),
-    "--model",
-    os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro"),
-]
+    # Call the configured LLM (pro/stronger variant recommended for this step)
+    cmd = [
+        "hermes",
+        "chat",
+        "-q",
+        context,
+        "--quiet",
+        "--ignore-rules",
+        "--ignore-user-config",
+        "--max-turns",
+        "1",
+        "--source",
+        "tool",
+        "--provider",
+        os.environ.get("LLM_PROVIDER", "nous"),
+        "--model",
+        os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro"),
+    ]
 
-print("Calling LLM for synthesis...", flush=True)
-import time
+    print("Calling LLM for synthesis...", flush=True)
+    import time
 
-t0 = time.time()
-r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)
-elapsed = time.time() - t0
-print(f"Got response in {elapsed:.0f}s ({len(r.stdout):,} chars)", flush=True)
+    t0 = time.time()
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)
+    elapsed = time.time() - t0
+    print(f"Got response in {elapsed:.0f}s ({len(r.stdout):,} chars)", flush=True)
 
-out = r.stdout
-lines = [l for l in out.split("\n") if not l.startswith("session_id:")]
-clean = "\n".join(lines).strip()
+    out = r.stdout
+    lines = [l for l in out.split("\n") if not l.startswith("session_id:")]
+    clean = "\n".join(lines).strip()
 
-# Write
-OUT.write_text(clean, encoding="utf-8")
-print(f"Wrote {OUT} ({OUT.stat().st_size // 1024} KB)", flush=True)
+    # Write
+    OUT.write_text(clean, encoding="utf-8")
+    print(f"Wrote {OUT} ({OUT.stat().st_size // 1024} KB)", flush=True)
+
+
+if __name__ == "__main__":
+    main()

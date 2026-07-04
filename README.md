@@ -228,6 +228,20 @@ Features:
 
 See [`examples/quickstart.ipynb`](examples/quickstart.ipynb) for a full walkthrough.
 
+## Output formats
+
+`parallax-analyze` supports two output formats for stats:
+
+```bash
+# JSON (default — writes stats.json):
+parallax-analyze --input export.json --platform discord --out ./out
+
+# CSV (writes stats.csv — flat key-value layout for spreadsheets/BI tools):
+parallax-analyze --input export.json --platform discord --out ./out --format csv
+```
+
+CSV layout: `category,key,value` — one row per metric (e.g. `metadata,total_messages,226`).
+
 ## Privacy
 
 - User IDs are SHA-256-hashed with a local salt before reaching any output file

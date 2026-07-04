@@ -2,13 +2,15 @@
 # Legacy one-shot scripts: suppress structural style rules.
 # These scripts ran once and produced their output — refactoring
 # them for style adds risk with zero benefit.
+# F841 added after wrapping in main(): function-scope unused vars
+# that were fine at module scope.
 
 [lint.per-file-ignores]
-"src/parallax/streams/build_final_report.py" = ["E402", "E722", "E741"]
-"src/parallax/streams/narrative_synthesis.py" = ["E402", "E701", "E741"]
-"src/parallax/streams/post_analysis.py" = ["E402", "E701", "E722"]
-"src/parallax/streams/semantic_retrieval.py" = ["E402", "E741"]
-"src/parallax/streams/fact_extraction.py" = ["E402", "E701", "E741"]
-"src/parallax/streams/deterministic_analytics.py" = ["E401", "E701", "E702", "E722"]
+"src/parallax/streams/build_final_report.py" = ["E402", "E722", "E741", "F841"]
+"src/parallax/streams/narrative_synthesis.py" = ["E402", "E701", "E741", "F841"]
+"src/parallax/streams/post_analysis.py" = ["E402", "E701", "E722", "F841"]
+"src/parallax/streams/semantic_retrieval.py" = ["E402", "E741", "F841"]
+"src/parallax/streams/fact_extraction.py" = ["E402", "E701", "E741", "F841"]
+"src/parallax/streams/deterministic_analytics.py" = ["E401", "E701", "E702", "E722", "F841"]
 "src/parallax/streams/topics.py" = ["E741", "F401"]
 "src/parallax/core/analyze.py" = ["F401"]
