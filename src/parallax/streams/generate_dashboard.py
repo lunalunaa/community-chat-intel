@@ -63,7 +63,15 @@ body {
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
+  position: relative;
+  overflow-x: hidden;
 }
+/* --- Node graph background --- */
+#node-bg {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none; opacity: 0.4;
+}
+body > *:not(#node-bg) { position: relative; z-index: 1; }
 /* --- Header --- */
 .header {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -558,6 +566,81 @@ function renderAll() {
   if (HAS_TREND) renderTrendChart();
 }
 
+// --- Node graph background ---
+(function() {
+  var canvas = document.getElementById('node-bg');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var nodes = [];
+  var maxNodes = 40;
+  var maxDist = 130;
+  var colors = ['#6c8aff', '#39c5cf', '#3fb950', '#f778ba'];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function initNodes() {
+    nodes = [];
+    for (var i = 0; i < maxNodes; i++) {
+      nodes.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: Math.random() * 2 + 1,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
+    }
+  }
+  initNodes();
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw connections
+    for (var i = 0; i < nodes.length; i++) {
+      for (var j = i + 1; j < nodes.length; j++) {
+        var dx = nodes[i].x - nodes[j].x;
+        var dy = nodes[i].y - nodes[j].y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < maxDist) {
+          var alpha = (1 - dist / maxDist) * 0.5;
+          ctx.strokeStyle = 'rgba(108, 138, 255, ' + alpha + ')';
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    // Draw nodes
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      ctx.fillStyle = n.color;
+      ctx.shadowColor = n.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    // Move nodes
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+      if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
 renderAll();
 """
 
@@ -653,6 +736,8 @@ def generate_dashboard(
 </style>
 </head>
 <body>
+
+<canvas id="node-bg"></canvas>
 
 <div class="header">
   <h1><span class="accent">\u25c6</span> Parallax Community Dashboard</h1>
