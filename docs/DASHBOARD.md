@@ -1,190 +1,216 @@
-# Dashboard — Usage & Interpretation Guide
+# Dashboard — Usage & Customization Guide
 
-> **Scope note:** this document describes a companion daily-monitoring service that generates the dashboard below. That service is **not included in this repo** — it depends on org-specific scheduling/delivery infrastructure and isn't part of the core `parallax` package. This doc is kept as a design reference for anyone building their own daily-digest service on top of `parallax-analyze`'s output (see `docs/PIPELINE.md` File Reference section for the minimal shape to replicate).
-
-The daily service renders a self-contained HTML dashboard at `dailies/dashboard.html`. No server, no build step — open it in any browser. Everything is embedded.
+> **Scope:** Documents the `generate_dashboard.py` module — a self-contained
+> interactive HTML dashboard generator that reads `stats.json` and produces
+> a single HTML file with all CSS/JS/data embedded. No server, no build step,
+> no external dependencies.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Open the dashboard in your default browser
-open ~/your-analysis-dir/dailies/dashboard.html        # macOS
-xdg-open ~/your-analysis-dir/dailies/dashboard.html    # Linux
-start ~/your-analysis-dir/dailies/dashboard.html       # Windows/WSL
+# Single run (with drill-down — click any bar to see matching messages):
+python -m parallax.streams.generate_dashboard \
+    --stats ./out/stats.json \
+    --users ./out/users.json \
+    --chat ./export.json \
+    --out ./out/dashboard.html
+
+# Trend view (compare multiple runs):
+python -m parallax.streams.generate_dashboard \
+    --stats ./run1/stats.json ./run2/stats.json ./run3/stats.json \
+    --out ./out/dashboard.html
+
+# Open in browser:
+open ./out/dashboard.html        # macOS
+xdg-open ./out/dashboard.html    # Linux
+start ./out/dashboard.html       # Windows/WSL
 ```
 
-Or just double-click `dashboard.html` in your file manager.
+---
 
-The dashboard works offline after first load (Chart.js CDN cache). Refresh the page to pick up new data — the service rewrites the file on each run.
+## Design
+
+Inspired by [magicui.design](https://magicui.design) and
+[performative-ui](https://vorpus.github.io/performativeUI/) patterns:
+
+- **Dark theme** (`#0a0b0f` background, glass-card surfaces with `backdrop-filter: blur`)
+- **Number ticker animation** — KPI numbers count up from 0 on page load
+- **Bento grid** — varied card sizes (span-2, span-4) with responsive breakpoints
+- **Gradient bar fills** — linear-gradient fills with animated width transitions
+- **SVG trend chart** — gridlines, axis labels, hover tooltips, animated bar growth
+- **Auto-generated insights** — 2-4 plain-English pills at the top derived from the data
+- **Section-specific glow** — pain points glow red, topic mentions glow green
+- **Blur fade-in** — cards animate in with `filter: blur()` on load
+- **Shine border** — animated conic-gradient traveling along card borders
+- **Node graph background** — 40 glowing particles drifting and connecting with thin lines
 
 ---
 
 ## Layout
 
-The dashboard is a responsive grid of cards, each showing one metric or chart. It reflows from two columns on desktop to a single column on mobile.
-
 ```
-┌─────────────────────────────────────────────────┐
-│  Product · Community Dashboard                   │
-│  Chat name · member count · last updated        │
-├──────────────────┬──────────────────────────────┤
-│  📊 Today        │  📈 Activity (7 days)        │
-│  KPIs: msgs,     │  Bar chart: daily message    │
-│  users, target-  │  volume with today           │
-│  language,       │  highlighted                 │
-│  questions,      │                              │
-│  friction        │                              │
-├──────────────────┼──────────────────────────────┤
-│  👥 Users (7d)   │  🔥 Top Keywords (today)     │
-│  Line chart:     │  Per-category keyword        │
-│  active posters  │  breakdown with counts       │
-│  per day         │                              │
-├──────────────────┴──────────────────────────────┤
-│  📋 Recent Topics          │  ⚠️ Friction (7d)  │
-│  Table: keyword-topic      │  Dual line chart:  │
-│  distribution today, with  │  friction signals   │
-│  proportional bars         │  + questions asked  │
-├─────────────────────────────────────────────────┤
-│  📰 Latest Digest                               │
-│  Full daily summary rendered as formatted       │
-│  markdown — what happened, key themes,          │
-│  friction, notable threads                       │
-├─────────────────────────────────────────────────┤
-│  📋 Recent Digests                              │
-│  Last 7 days: date, message count, users, TL;DR │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  ◆ Parallax Community Dashboard                              │
+│  channel · msgs · language / region · date range             │
+├─────────────────────────────────────────────────────────────┤
+│  [insight] [insight] [insight] [insight]                    │
+│  (auto-generated from data: top mention, friction %, etc.)   │
+├─────────────────────────────────────────────────────────────┤
+│  [Run ▾] [Current] [Trend] [All] [Target-lang]              │
+├──────────┬──────────┬──────────┬──────────┬─────────────────┤
+│ MESSAGES │  USERS   │ TARGET   │ QUESTIONS│  FRICTION       │
+│  (ticker) │ (ticker) │ (ticker) │ (ticker) │  (ticker, glow) │
+├──────────┴──────────┴──────────┴──────────┴─────────────────┤
+│  [Language Distribution]                                     │
+├──────────────────────────┬──────────────────┬───────────────┤
+│  [Top Mentions]          │ [Platforms]      │ [Timezone]    │
+│  (span-2, gradient bars) │ (gradient bars)  │ (bars)        │
+├──────────────────────────┼──────────────────┼───────────────┤
+│  [Pain Points]           │ [Topic Mentions] │ [Retention]   │
+│  (glow red)              │ (glow green)     │ (span-2)      │
+├──────────────────────────┴──────────────────┴───────────────┤
+│  [Setup Methods]  [External Communities]  [Alternatives]     │
+│  (auto-discovered — only shows sections with data)           │
+├──────────────────────────────────────────────────────────────┤
+│  Generated by parallax vX.Y · timestamp                      │
+└──────────────────────────────────────────────────────────────┘
+
+Background: animated node graph (40 particles, connecting lines)
 ```
 
 ---
 
-## Section Reference
+## Features
 
-### 📊 Today — KPIs
+### Auto-generated Insights
 
-Key performance indicators for the most recent day of data:
+The dashboard generates 2-4 insight pills at the top from the current run's data:
 
-| Metric | What it tells you |
-|--------|-------------------|
-| **Messages** | Total messages today. Compare day-over-day in the activity chart. |
-| **Active users** | Unique posters today. |
-| **Target-language** | Messages flagged as target-language or mixed-language by the configured `LanguageProfile` (see `src/parallax/core/languages.py`) — script-ratio for CJK/Cyrillic/Arabic/etc., stopword-ratio for Latin-script languages. |
-| **Questions** | Messages ending in question markers or containing question keywords (per the active language profile). |
-| **Friction signals** | Errors, network complaints, timeout, confusion, API key issues, and other problem keywords. |
+- **Top mention** — "cargo is the most mentioned provider (44 mentions)"
+- **Pain points** — "42% of messages mention friction (99 signals)"
+- **Answer rate** — "Answer rate: 65% (48h window)" or "No questions answered within 48h"
+- **Delta vs previous** — "+20 messages vs previous run" (only in trend view)
 
-> **Healthy:** messages stable or growing, users diverse, friction <15% of messages.  
-> **Watch:** message count dropping 3+ days, friction spiking, active users concentrating in top 3.
+Each pill has a colored dot (red/green/yellow/accent) with a glow shadow.
 
----
+### KPI Cards
 
-### 📈 Activity — 7-Day Bar Chart
+Six cards with animated number tickers (count up from 0 on load):
 
-A Chart.js bar chart showing daily message volume for the last 7 days (up to 14 when data exists). Today's bar is highlighted; previous days are faded.
+| Card | Value | Sub-text |
+|------|-------|----------|
+| Messages | Total analyzed | "total analyzed" |
+| Users | Unique posters | "N target-lang" |
+| Target-lang | Target-language messages | "N mixed" |
+| Questions | Question-marked messages | "N target" |
+| Friction | Pain-point signals | "N% of msgs" (red if >15%) |
+| Answered | 48h answer rate | "48h window" |
 
-**What to look for:**
-- **Weekday/weekend pattern** — many tech communities drop 30-50% on weekends
-- **Sudden spikes** — viral content shares, new release announcements, or a hot topic blowing up
-- **Declining trend** — 5+ days of declining volume may signal community fatigue or a competing platform draining attention
+In trend view, each card shows a delta badge (↑ 5% vs prev) compared to the previous run.
 
----
+### Bar Lists
 
-### 👥 Users — 7-Day Line Chart
+Each category section renders as a bar list with:
+- **Gradient fills** (per-category color: accent/blue for mentions, red for pain points, etc.)
+- **Animated width** on render (cubic-bezier transition, 0.6s)
+- **Delta indicators** in trend view (+N / -N vs previous run, green/red)
+- **Click to drill down** — opens a panel showing matching messages
 
-A Chart.js line chart of unique active posters per day. Green fill under the curve.
+### Drill-down
 
-**What to look for:**
-- **Flat or rising line** — community is maintaining or growing its active core
-- **Declining line with stable message count** — fewer people are talking more (concentration risk)
-- **Spike + return to baseline** — one-day influx with low retention
+Click any bar to expand a panel showing up to 20 matching messages with:
+- Timestamp
+- Sender name
+- Message content (truncated to 300 chars)
 
-The ratio between this chart and the activity chart matters. If messages stay high but users drop, the top 3-5 posters are carrying the conversation — fragile if any of them leave.
+The search uses keyword terms derived from `keywords.py` at generation time —
+no locale-specific hardcoding. Labels like "confused" or "borrow_checker_fight"
+are mapped to their actual search patterns (e.g., "how", "borrow checker") so
+the drill-down finds the right messages.
 
----
+Pass `--chat` (raw export JSON) or `--users` (users.json) to enable drill-down.
 
-### 🔥 Top Keywords — Today
+### Trend View
 
-Keyword hits grouped by category, with raw counts:
+When multiple `--stats` files are passed:
+- **Run selector** dropdown to switch between runs
+- **Current / Trend** view toggle
+- Trend view shows an **SVG bar chart** comparing total messages per run:
+  - Gridlines with y-axis values
+  - Date labels on x-axis
+  - Value numbers above each bar
+  - Current run highlighted in accent color, others dimmed
+  - Hover tooltips (native SVG `<title>`)
+- All bar lists show **delta indicators** vs the previous run
+- KPI cards show **percentage delta badges**
 
-| Category | What it covers |
-|----------|---------------|
-| **PROVIDERS** | LLM/API providers mentioned in your ecosystem (configure in `keywords.py`) |
-| **MESSAGING** | Chat platforms referenced (configure in `keywords.py`) |
-| **FEATURES** | Your product's feature names (configure in `keywords.py`) |
-| **FRICTION** | error, timeout, network issues, confusion, broken, key issues, etc. |
-| **COMPETITORS** | Named competitor products in your market (configure in `keywords.py`) |
+### Node Graph Background
 
-Only the top 5 per category are shown. If a category is absent, no keywords of that type were detected today.
-
-> **Interpretation tip:** High `FEATURES` + low `FRICTION` = users are exploring advanced functionality without pain. High `FRICTION` + high `PROVIDERS` = provider-config issues (check the digest for specifics).
-
----
-
-### 📋 Recent Topics — Today's Distribution
-
-A table showing which keyword labels were mentioned most today, with a proportional bar visualization. Each row shows the label, raw count, and share of total keyword hits.
-
-> **Not a true topic model** — these are keyword-hit aggregates, not LLM-classified topics. Use the digest (below) for semantic topic understanding; use this for quick distribution scanning.
-
----
-
-### ⚠️ Friction Signals — 7-Day Dual Line Chart
-
-Two overlaid line charts:
-- **Red (Friction):** Daily count of friction keyword hits (errors, network issues, timeout, confusion, etc.)
-- **Amber (Questions):** Daily count of detected question messages
-
-**What to look for:**
-- **Friction spiking while questions are flat** — an acute technical problem (outage, breaking change, provider deprecation)
-- **Questions spiking while friction is flat** — onboarding wave (new users asking setup questions)
-- **Both spiking together** — major incident or release with breaking changes
-- **Both declining** — community is self-sufficient or the friction sources have been addressed
+A fixed-position canvas behind all content:
+- 40 nodes with random positions, velocities, and colors (accent blue, cyan, green, pink)
+- Nodes drift slowly, bouncing off screen edges
+- Pairs within 130px draw a thin connecting line (opacity proportional to distance)
+- Nodes have glow shadow (`shadowBlur: 6px`)
+- 40% opacity, `pointer-events: none`, `z-index: 0`
+- All content sits at `z-index: 1` above the canvas
 
 ---
 
-### 📰 Latest Digest
+## Category Labels
 
-The full daily digest rendered as formatted HTML. This is the richest section — it contains the LLM-generated narrative summary of today's conversation.
+Section headers are **not hardcoded** — they come from
+`config/categories.yaml`:
 
-Sections within the digest:
-- **What Happened** — 3-5 bullet points capturing the main discussions
-- **Key Themes** — table with topic, share, and signal interpretation
-- **Friction & Issues** — specific problems, complaints, errors surfaced today
-- **Notable** — long threads, resolved questions, success stories, competitor mentions, brand confusion incidents
-- **TL;DR** — one-sentence summary
+```yaml
+labels:
+  providers: "Top mentions"
+  friction_signals: "Pain points"
+  features: "Topic mentions"
+  install_paths: "Setup methods"
+  competitors: "Alternatives"
+  location_proxy: "Timezone distribution"
+  # ...etc
+```
 
-> The digest is generated by a single LLM call per day (~$0.02). It synthesizes the keyword data plus a sample of actual messages to produce a coherent narrative. If the LLM is unavailable, a lightweight fallback digest is generated from keyword stats alone.
+The dashboard **auto-discovers** which sections to render based on what data
+exists in the current `stats.json`. If a category has no data, its section
+is skipped entirely.
+
+To customize labels, copy `categories.yaml` to your own directory and set
+`PARALLAX_CONFIG_DIR`:
+
+```bash
+cp -r src/parallax/config/ ~/my-parallax-config/
+# edit ~/my-parallax-config/categories.yaml...
+export PARALLAX_CONFIG_DIR=~/my-parallax-config/
+```
 
 ---
 
-### 📋 Recent Digests
+## Theme Customization
 
-Last 7 days of digests as a compact list: date, message count, active user count, TL;DR. Click through to the full digest above for the most recent day; for earlier days, open `dailies/YYYY-MM-DD.md` directly.
+All colors are CSS variables at the top of the embedded `<style>`:
 
----
+```css
+:root {
+  --bg: #0a0b0f;
+  --surface: rgba(18, 20, 26, 0.85);
+  --border: #252834;
+  --text: #e8eaed;
+  --accent: #6c8aff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d2991d;
+  --cyan: #39c5cf;
+  --pink: #f778ba;
+  /* ...etc */
+}
+```
 
-## Interpreting the Dashboard Day-to-Day
-
-### What a healthy community looks like
-
-| Indicator | Healthy pattern |
-|-----------|----------------|
-| Messages | 150-400/day, slight weekday/weekend oscillation |
-| Users | 25-60/day, no single user above 15% of messages |
-| Target-language share | 70-90% (normal for a well-scoped target-language chat) |
-| Friction | Under 20% of messages, flat or declining trend |
-| Questions | 15-40/day, most answered (see digest) |
-| Keywords | Diverse across providers/messaging/features; no single topic dominating >40% |
-
-### Red flags
-
-| Pattern | What it suggests |
-|---------|-----------------|
-| Messages halved for 5+ days | Community migrating to another platform |
-| Friction spiking 2×+ | Outage, breaking change, or provider deprecation |
-| Users declining while messages stable | Concentration in top posters — fragile |
-| Single keyword dominating (>50%) | Crisis or monoculture — check digest immediately |
-| Zero messages | Fetch failed — check your daily service's status |
+Edit the generated HTML directly, or modify the `_CSS` constant in
+`generate_dashboard.py` for permanent changes.
 
 ---
 
@@ -192,55 +218,25 @@ Last 7 days of digests as a compact list: date, message count, active user count
 
 | File | Purpose |
 |------|---------|
-| `dailies/dashboard.html` | Self-contained dashboard (open in browser) |
-| `dailies/dashboard_data.json` | Machine-readable data backing the dashboard |
-| `dailies/YYYY-MM-DD.md` | Daily digest markdown for each day |
-| `dailies/feed.md` | Rolling 7-day feed of all recent digests |
-| `daily_state.db` | SQLite database backing all dashboard data |
+| `src/parallax/streams/generate_dashboard.py` | Dashboard generator module |
+| `src/parallax/config/categories.yaml` | Category labels + bar colors |
+| `out/dashboard.html` | Generated dashboard (gitignored) |
 
 ---
 
-## Customization
+## CLI Reference
 
-### Changing the time window
-
-The dashboard shows up to 14 days of charts. To change this, edit the `LIMIT 14` in `generate_dashboard()` in your daily service implementation.
-
-### Adding a new chart
-
-1. Add your metric to the `daily_stats` table (add a column in `init_db()`)
-2. Populate it in your analysis-and-digest function
-3. Add a `<canvas>` element and Chart.js block to the `DASHBOARD_HTML` template
-4. The data flows through `dashboard_data.json` → `DATA` JS object automatically
-
-### Changing the theme
-
-The CSS variables at the top of `DASHBOARD_HTML` control all colors:
-
-```css
-:root {
-    --bg: #0d1117;        /* page background */
-    --surface: #161b22;   /* card background */
-    --border: #30363d;    /* card borders */
-    --text: #e6edf3;      /* body text */
-    --muted: #8b949e;     /* secondary text */
-    --accent: #58a6ff;    /* highlights, links */
-    --green: #3fb950;     /* positive indicators */
-    --red: #f85149;       /* negative indicators */
-    --yellow: #d2991d;    /* warnings */
-}
+```
+python -m parallax.streams.generate_dashboard \
+    --stats <path> [<path> ...] \
+    --users <path> \
+    --chat <path> \
+    --out <path>
 ```
 
-The default is GitHub's dark theme. For a light theme, swap the values.
-
-### Hosting on a server
-
-If you want to serve the dashboard over HTTP instead of opening files locally:
-
-```bash
-cd ~/your-analysis-dir/dailies
-python3 -m http.server 8080
-# → http://localhost:8080/dashboard.html
-```
-
-The dashboard is entirely static — no backend needed. The data is embedded in the HTML at generation time.
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--stats` | Yes | One or more `stats.json` paths. Multiple enables trend view. |
+| `--users` | No | Path to `users.json` (enables drill-down) |
+| `--chat` | No | Path to raw chat export JSON (enables message-level drill-down) |
+| `--out` | Yes | Output path for `dashboard.html` |
