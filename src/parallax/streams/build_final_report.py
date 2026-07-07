@@ -14,7 +14,6 @@ Sections:
 import json
 import os
 import re
-import subprocess
 import time
 from collections import Counter
 from pathlib import Path
@@ -158,37 +157,17 @@ Rules:
 
     print(f"Recommendations context: {len(rec_context):,} chars", flush=True)
 
-    # Call MiMo
-    cmd = [
-        "hermes",
-        "chat",
-        "-q",
-        rec_context,
-        "--quiet",
-        "--ignore-rules",
-        "--ignore-user-config",
-        "--max-turns",
-        "1",
-        "--source",
-        "tool",
-        "--provider",
-        os.environ.get("LLM_PROVIDER", "nous"),
-        "--model",
-        os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro"),
-    ]
-    print("Calling xiaomi/mimo-v2.5-pro for Recommendations section...", flush=True)
+    print("Calling LLM for Recommendations section...", flush=True)
     t0 = time.time()
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)
+    from parallax.streams.llm_cli import call_llm_pro
+
+    raw = call_llm_pro(rec_context, timeout=600)
     elapsed = time.time() - t0
-    print(
-        f"Got recommendations in {elapsed:.0f}s ({len(r.stdout):,} chars)", flush=True
-    )
-    out = r.stdout
+    print(f"Got recommendations in {elapsed:.0f}s ({len(raw):,} chars)", flush=True)
     lines = [
         l
-        for l in out.split("\n")
-        if not l.startswith("session_id:")
-        and not l.startswith("⚠️")
+        for l in raw.split("\n")
+        if not l.startswith("\u26a0\ufe0f")
         and "maximum iterations" not in l
         and "file write failed" not in l.lower()
         and not l.startswith("The file")

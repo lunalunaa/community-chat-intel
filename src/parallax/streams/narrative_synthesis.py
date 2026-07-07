@@ -3,7 +3,6 @@
 
 import json
 import os
-import subprocess
 from collections import Counter
 from pathlib import Path
 
@@ -172,36 +171,15 @@ Rules:
 
     print(f"Context size: {len(context):,} chars", flush=True)
 
-    # Call the configured LLM (pro/stronger variant recommended for this step)
-    cmd = [
-        "hermes",
-        "chat",
-        "-q",
-        context,
-        "--quiet",
-        "--ignore-rules",
-        "--ignore-user-config",
-        "--max-turns",
-        "1",
-        "--source",
-        "tool",
-        "--provider",
-        os.environ.get("LLM_PROVIDER", "nous"),
-        "--model",
-        os.environ.get("LLM_MODEL_PRO", "xiaomi/mimo-v2.5-pro"),
-    ]
-
     print("Calling LLM for synthesis...", flush=True)
     import time
 
     t0 = time.time()
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=True)
-    elapsed = time.time() - t0
-    print(f"Got response in {elapsed:.0f}s ({len(r.stdout):,} chars)", flush=True)
+    from parallax.streams.llm_cli import call_llm_pro
 
-    out = r.stdout
-    lines = [l for l in out.split("\n") if not l.startswith("session_id:")]
-    clean = "\n".join(lines).strip()
+    clean = call_llm_pro(context, timeout=600)
+    elapsed = time.time() - t0
+    print(f"Got response in {elapsed:.0f}s ({len(clean):,} chars)", flush=True)
 
     # Write
     OUT.write_text(clean, encoding="utf-8")

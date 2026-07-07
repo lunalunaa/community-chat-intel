@@ -180,6 +180,81 @@ def diff_stats_json(old: dict, new: dict) -> dict:
     return result
 
 
+def diff_stats_csv(old: dict, new: dict) -> str:
+    """Produce a CSV diff of two stats dicts."""
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["category", "key", "old", "new", "delta", "status"])
+
+    old_meta = old.get("metadata", {})
+    new_meta = new.get("metadata", {})
+
+    # KPIs
+    kpis = [
+        (
+            "messages",
+            old_meta.get("total_messages", 0),
+            new_meta.get("total_messages", 0),
+        ),
+        (
+            "users",
+            old.get("users", {}).get("total", 0),
+            new.get("users", {}).get("total", 0),
+        ),
+        (
+            "questions",
+            old.get("help_answered", {}).get("total_questions", 0),
+            new.get("help_answered", {}).get("total_questions", 0),
+        ),
+        (
+            "friction",
+            sum(old.get("friction_signals", {}).values()),
+            sum(new.get("friction_signals", {}).values()),
+        ),
+    ]
+    for key, o, n in kpis:
+        if o != n:
+            status = "new" if o == 0 else "gone" if n == 0 else "changed"
+            writer.writerow(["kpi", key, o, n, n - o, status])
+
+    # Counters
+    counter_fields = [
+        "providers",
+        "competitors",
+        "messaging_platforms",
+        "features",
+        "friction_signals",
+        "install_paths",
+        "shadow_community_mentions",
+        "language_distribution",
+        "location_proxy",
+    ]
+    for field in counter_fields:
+        old_c = old.get(field, {})
+        new_c = new.get(field, {})
+        for k in sorted(set(old_c) | set(new_c)):
+            o = old_c.get(k, 0)
+            n = new_c.get(k, 0)
+            if o != n:
+                status = "new" if o == 0 else "gone" if n == 0 else "changed"
+                writer.writerow([field, k, o, n, n - o, status])
+
+    # URL categories
+    old_urls = old.get("urls", {}).get("category_counts", {})
+    new_urls = new.get("urls", {}).get("category_counts", {})
+    for k in sorted(set(old_urls) | set(new_urls)):
+        o = old_urls.get(k, 0)
+        n = new_urls.get(k, 0)
+        if o != n:
+            status = "new" if o == 0 else "gone" if n == 0 else "changed"
+            writer.writerow(["urls", k, o, n, n - o, status])
+
+    return output.getvalue()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Compare two stats.json files and highlight what changed."
@@ -193,13 +268,22 @@ def main() -> int:
     parser.add_argument(
         "--json", action="store_true", help="Output JSON instead of text"
     )
+    parser.add_argument(
+        "--format",
+        choices=["text", "json", "csv"],
+        default="text",
+        help="Output format (default: text)",
+    )
     args = parser.parse_args()
 
     old = json.loads(args.old.read_text())
     new = json.loads(args.new.read_text())
 
-    if args.json:
-        print(json.dumps(diff_stats_json(old, new), indent=2))
+    if args.format == "csv" or args.json:
+        if args.format == "csv":
+            print(diff_stats_csv(old, new), end="")
+        else:
+            print(json.dumps(diff_stats_json(old, new), indent=2))
     else:
         print(diff_stats(old, new))
     return 0

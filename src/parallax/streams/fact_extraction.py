@@ -71,27 +71,9 @@ def format_chunk(chunk):
 
 
 def call_llm(prompt, timeout=180):
-    cmd = [
-        "hermes",
-        "chat",
-        "-q",
-        prompt,
-        "--quiet",
-        "--ignore-rules",
-        "--ignore-user-config",
-        "--max-turns",
-        "1",
-        "--source",
-        "tool",
-        "--provider",
-        os.environ.get("LLM_PROVIDER", "nous"),
-        "--model",
-        os.environ.get("LLM_MODEL", "xiaomi/mimo-v2.5"),
-    ]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=True)
-    out = r.stdout
-    lines = [l for l in out.split("\n") if not l.startswith("session_id:")]
-    return "\n".join(lines).strip()
+    from parallax.streams.llm_cli import call_llm as _call
+
+    return _call(prompt, timeout=timeout)
 
 
 def tolerant_json_parse(raw: str):

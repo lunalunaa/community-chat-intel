@@ -64,12 +64,14 @@ Files in `src/parallax/streams/` (except `topics.py` and `generate_dashboard.py`
 ```
 src/parallax/
 ├── core/                        # Main pipeline + utilities
-│   ├── analyze.py               # parallax-analyze: main pipeline
+│   ├── analyze.py               # parallax-analyze: thin CLI wrapper (re-exports from adapters + pipeline)
+│   ├── adapters.py              # Platform adapters (discord, telegram, lark, slack, csv, canonical) + Message dataclass
+│   ├── pipeline.py              # run_pipeline, classify_language, classify_url, merge_stats, render_report
 │   ├── languages.py             # Language/region profile registry (13 langs, 7 regions)
 │   ├── keywords.py              # Keyword dictionaries — customize for your community
 │   ├── crosstabs.py             # parallax-crosstabs: cross-tabulation helper
 │   ├── config.py                # YAML config loader (PARALLAX_CONFIG_DIR)
-│   ├── diff.py                  # parallax-diff: stats comparison tool
+│   ├── diff.py                  # parallax-diff: stats comparison tool (--format text/json/csv)
 │   ├── init.py                  # parallax-init: project scaffolder
 │   └── state.py                 # SQLite state store for --incremental
 ├── config/                      # YAML/JSON config (override via PARALLAX_CONFIG_DIR)
@@ -80,6 +82,7 @@ src/parallax/
 │   ├── canonical_schema.json    # JSON Schema for --platform canonical
 │   └── templates/               # Ready-made keyword sets (AI product, gaming, programming)
 ├── streams/                     # 4-stream deep-analysis pipeline
+│   ├── llm_cli.py               # Shared LLM CLI helper (supports LLM_COMMAND env var)
 │   ├── topics.py                # Stream A: LLM topic-tagging (parallax-topics)
 │   ├── semantic_retrieval.py    # Stream B: embeddings + FAISS semantic search
 │   ├── fact_extraction.py       # Stream C: structured LLM fact extraction
@@ -104,7 +107,11 @@ src/parallax/
 
 Other stream scripts are one-shot modules — run with `python -m parallax.streams.<name>`.
 
-### Pipeline stages (analyze.py)
+### Pipeline stages (analyze.py → adapters.py + pipeline.py)
+
+The CLI entry point is `analyze.py:main()`. It loads messages via
+`adapters.py` (platform-specific → canonical schema), then runs
+`pipeline.py:run_pipeline()` which:
 
 1. Load adapter (platform-specific → canonical schema)
 2. Language classify each message (per `--target-language` profile)

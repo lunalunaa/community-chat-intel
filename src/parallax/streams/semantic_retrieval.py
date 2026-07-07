@@ -225,39 +225,16 @@ def main() -> None:
         ]
         prompt = "\n".join(prompt_lines)
 
-        cmd = [
-            "hermes",
-            "chat",
-            "-q",
-            prompt,
-            "--quiet",
-            "--ignore-rules",
-            "--ignore-user-config",
-            "--max-turns",
-            "1",
-            "--source",
-            "tool",
-            "--provider",
-            os.environ.get("LLM_PROVIDER", "nous"),
-            "--model",
-            os.environ.get("LLM_MODEL", "xiaomi/mimo-v2.5"),
-        ]
         try:
-            r = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=180, check=True
-            )
-            out = r.stdout
-            # strip session_id line
-            lines = out.split("\n")
-            clean = "\n".join(
-                l for l in lines if not l.startswith("session_id:")
-            ).strip()
+            from parallax.streams.llm_cli import call_llm as _call
+
+            clean = _call(prompt, timeout=180)
             findings[query_name] = {
                 "query": data["query"],
                 "analysis": clean,
                 "source_count": len(data["hits"]),
             }
-            print(f"  ✓ {query_name} ({len(clean)} chars)", flush=True)
+            print(f"  \u2713 {query_name} ({len(clean)} chars)", flush=True)
         except subprocess.TimeoutExpired:
             findings[query_name] = {
                 "query": data["query"],
