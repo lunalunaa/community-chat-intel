@@ -504,27 +504,27 @@ function renderSections() {
   // Build bento grid: 2-column rows, first card spans 2
   var html = '';
   var bentoRows = [];
+  var placed = {};  // track which categories have been placed to avoid duplicates
 
   // Row 1: first two categories (first one spans 2)
   if (dataCats.length >= 1) {
     var row = [];
     row.push({cat: dataCats[0], span: 2});
-    if (dataCats.length >= 2) row.push({cat: dataCats[1], span: 1});
-    if (dataCats.length >= 3) row.push({cat: dataCats[2], span: 1});
+    placed[dataCats[0]] = true;
+    if (dataCats.length >= 2) { row.push({cat: dataCats[1], span: 1}); placed[dataCats[1]] = true; }
+    if (dataCats.length >= 3) { row.push({cat: dataCats[2], span: 1}); placed[dataCats[2]] = true; }
     bentoRows.push(row);
   }
-  // Row 2: pain points + topics + retention
+  // Row 2: pain points + topics + retention (only if not already placed in row 1)
   var row2 = [];
-  if (dataCats.indexOf('friction_signals') >= 0) row2.push({cat: 'friction_signals', span: 1, glow: 'red'});
-  if (dataCats.indexOf('features') >= 0) row2.push({cat: 'features', span: 1, glow: 'green'});
+  if (dataCats.indexOf('friction_signals') >= 0 && !placed['friction_signals']) { row2.push({cat: 'friction_signals', span: 1, glow: 'red'}); placed['friction_signals'] = true; }
+  if (dataCats.indexOf('features') >= 0 && !placed['features']) { row2.push({cat: 'features', span: 1, glow: 'green'}); placed['features'] = true; }
   // Retention is always shown
   row2.push({cat: '__retention__', span: 2});
   if (row2.length > 1) bentoRows.push(row2);
 
-  // Row 3: remaining categories
-  var row3Cats = dataCats.filter(function(c) {
-    return dataCats.indexOf(c) >= 3 && c !== 'friction_signals' && c !== 'features';
-  });
+  // Row 3: remaining categories (not yet placed)
+  var row3Cats = dataCats.filter(function(c) { return !placed[c]; });
   if (row3Cats.length > 0) {
     var row3 = row3Cats.map(function(c) { return {cat: c, span: 1}; });
     bentoRows.push(row3);
