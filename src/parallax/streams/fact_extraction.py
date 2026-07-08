@@ -13,7 +13,7 @@ Env vars:
   TARGET_LANGUAGE    Language name injected into the extraction prompt (default en)
   TS_UTC_OFFSET_HOURS  UTC offset for tz-less display timestamps (default 0)
   LLM_PROVIDER       LLM CLI provider (default nous)
-  LLM_MODEL          LLM CLI model (default xiaomi/mimo-v2.5)
+  LLM_MODEL          LLM CLI model (default: configured by llm_cli.py)
   CONCURRENCY        Parallel chunk extractions (default 4)
 """
 

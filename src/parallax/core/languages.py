@@ -264,7 +264,7 @@ REGION_PROFILES: dict[str, RegionProfile] = {
             "github_discussions": ["github discussions", "github issues"],
         },
         timezone_buckets={
-            "mainland_evening": (12, 16),  # UTC 12-16 = evening 20-24 Beijing (UTC+8)
+            "mainland_evening": (12, 16),  # UTC 12-16 = evening 20-24 in UTC+8 region
             "na_evening": (0, 6),  # UTC 0-6 = evening PT/ET
             "eu_evening": (18, 22),  # UTC 18-22 = evening CET
         },

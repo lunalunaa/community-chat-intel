@@ -63,11 +63,10 @@ def format_size(p):
             if p.stat().st_size > 1024
             else f"{p.stat().st_size:>6,} B "
         )
-    except:
+    except Exception:
         return ""
 
 
-# Placeholder — main() body is appended below via patch.
 def main() -> None:
     # =========================================================================
     # Load findings_final_v2.md — split into exec summary vs rest

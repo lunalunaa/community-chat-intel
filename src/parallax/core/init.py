@@ -165,13 +165,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--language",
-        default="zh",
-        help="Default target language code (default: zh)",
+        default="none",
+        help="Default target language code (default: none — disables language split)",
     )
     parser.add_argument(
         "--region",
-        default="cn",
-        help="Default region code (default: cn)",
+        default="global",
+        help="Default region code (default: global)",
     )
     args = parser.parse_args()
 

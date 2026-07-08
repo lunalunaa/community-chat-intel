@@ -22,7 +22,7 @@ pivots:
 
 Works for any target language/region — pass `--region` to pick which
 REGION_PROFILE's timezone buckets and provider clusters apply (see
-languages.py; defaults to `cn` for backward compatibility). The cohort
+languages.py; defaults to `global`). The cohort
 pivoted on is "target_primary + bilingual" users as classified by analyze.py
 for whichever `--target-language` you used there.
 
@@ -61,9 +61,11 @@ GLOBAL_PROVIDER_CLUSTERS = {
 }
 
 # Messaging platform — collapse into broader buckets
+# These labels must match keys in keywords.py's MESSAGING dict.
+# Customize this mapping for your community's platforms.
 MESSAGING_BUCKETS = {
-    "enterprise_im": {"feishu_lark", "wechat", "wecom", "dingtalk", "slack"},
-    "consumer_im": {"telegram", "discord", "signal", "matrix", "whatsapp"},
+    "enterprise_im": {"slack", "feishu_lark", "wecom", "dingtalk"},
+    "consumer_im": {"discord", "telegram", "signal", "matrix", "whatsapp"},
 }
 
 # Deep / differentiator features (vs basic chat use) — EXAMPLE set, matches
@@ -542,11 +544,10 @@ def main() -> int:
     p.add_argument(
         "--region",
         type=str,
-        default="cn",
+        default="global",
         help="Region code controlling timezone-proxy buckets and regional-provider "
         "clustering (see languages.py REGION_PROFILES: cn, jp, kr, ru, latam, mena, "
-        "global, ...). Unknown codes fall back to 'global'. Default: cn "
-        "(backward-compatible).",
+        "global, ...). Unknown codes fall back to 'global'. Default: global.",
     )
     args = p.parse_args()
 

@@ -4,16 +4,12 @@
 Embeds all non-system messages with a multilingual model, builds a FAISS index,
 runs structured retrieval queries, feeds top-K results to an LLM for synthesis.
 
-Set TARGET_LANGUAGE to pick which QUERIES_BY_LANGUAGE example set to run
-(defaults to "zh" for backward compatibility with the original worked
-example; "en" is also provided — add your own entry for other languages).
-Set TS_UTC_OFFSET_HOURS if your export's display-format timestamps are in
-local time other than China Standard Time (the default).
+Set TARGET_LANGUAGE to pick which query set to run from config/queries.yaml
+(default: "en"). Set TS_UTC_OFFSET_HOURS if your export's display-format
+timestamps are in local time other than UTC (the default).
 
 Uses local sentence-transformers (no API) for embeddings; the LLM synthesis
-step shells out to `hermes chat -q` so any configured provider/model works —
-override via LLM_PROVIDER / LLM_MODEL env vars (defaults shown are just an
-example; edit the `cmd` list below if your LLM CLI isn't named `hermes`).
+step uses the shared llm_cli helper — set LLM_COMMAND to use a different CLI.
 """
 
 import json

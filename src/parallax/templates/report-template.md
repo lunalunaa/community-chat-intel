@@ -14,10 +14,10 @@
 NARRATIVE: Write 4-6 bullets capturing the most decision-relevant findings. Answer:
 - How big is the target-language cohort relative to the overall community?
 - Is it growing, stable, or shrinking?
-- What's the single loudest product pain point?
-- Which providers dominate in this community, and is your product's UX aligned with that?
-- Are impersonator sites a real issue in this data?
-- What, if anything, does this tell us about messaging-platform adapter demand?
+- What's the single loudest pain point?
+- Which tools/products dominate in this community, and is your product's UX aligned with that?
+- Is brand confusion a real issue in this data?
+- What, if anything, does this tell us about platform-integration demand?
 
 ---
 
@@ -41,7 +41,7 @@ NARRATIVE: Interpret the scale. What fraction of the community is target-languag
 
 ---
 
-## 2. Location proxy (via posting-hour analysis)
+## 2. Timezone distribution (via posting-hour analysis)
 
 Most target-language users post in these UTC clusters (used as a timezone proxy):
 
@@ -54,7 +54,7 @@ Most target-language users post in these UTC clusters (used as a timezone proxy)
 - `eu_evening` — modal post hour 18–22 UTC → likely Europe
 - `other` — unclear / daytime / mixed
 
-NARRATIVE: Does the cohort skew in-region or diaspora? This determines whether region-specific infrastructure (domestic model mirrors, local provider integrations, localized docs sites) is load-bearing or whether internationally-hosted services are sufficient.
+NARRATIVE: Does the cohort skew in-region or diaspora? This determines whether region-specific infrastructure (localized docs, regional service endpoints, local support channels) is load-bearing or whether internationally-hosted services are sufficient.
 
 ---
 
@@ -67,11 +67,11 @@ NARRATIVE: Does the cohort skew in-region or diaspora? This determines whether r
 | Lapsed 90+ days | {{stats.retention.target_lapsed_90d_plus}} |
 | One-time posters (single message ever) | {{stats.retention.target_one_time_posters}} |
 
-NARRATIVE: Lapsed rate is the most important single number for cohort product health. If >40% are lapsed/one-time, the onboarding-to-retention funnel is broken for this audience. Cross-reference with §7 friction signals to hypothesize cause. Call out any notable cohort transitions (e.g., "peak onboarding was [month], then drop-off").
+NARRATIVE: Lapsed rate is the most important single number for cohort product health. If >40% are lapsed/one-time, the onboarding-to-retention funnel is broken for this audience. Cross-reference with §7 pain points to hypothesize cause. Call out any notable cohort transitions (e.g., "peak onboarding was [month], then drop-off").
 
 ---
 
-## 4. Model provider mentions (organic, not polled)
+## 4. Top mentions (organic, not polled)
 
 Raw mention counts across all target-language messages:
 
@@ -79,82 +79,82 @@ Raw mention counts across all target-language messages:
 {{stats.providers}}
 ```
 
-NARRATIVE: Rank by mention share. Which providers dominate in this community? Is there a clear in-region vs diaspora split — do in-region users mention regional providers more? Compare to your product's supported-providers list:
-- Are users naming providers you already support? → good, provider UX is the lever
-- Are they naming providers you do NOT support? → gap in provider coverage
-- Is a specific provider mentioned at all? → signal on awareness of that provider's integration (if you have one)
+NARRATIVE: Rank by mention share. Which tools/products dominate in this community? Is there a clear in-region vs diaspora split — do in-region users mention different tools more? Compare to your product's supported set:
+- Are users naming tools/products you already support? → good, UX is the lever
+- Are they naming tools/products you do NOT support? → gap in coverage
+- Is a specific tool/product mentioned at all? → signal on awareness of that integration (if you have one)
 
 ---
 
-## 5. Competitor mentions
+## 5. Alternatives
 
-Organic mentions of competitor products in target-language conversations:
+Organic mentions of alternative products in target-language conversations:
 
 ```
 {{stats.competitors}}
 ```
 
-NARRATIVE: Which competitors surface organically? Interpretation guide:
-- Heavy mentions of specific named competitors → users think of your product next to these as alternatives or comparison points. Not inherently a loss signal — depends on sentiment (see excerpts.md).
-- Mentions of competitors philosophically closest to your own product → organic mentions here indicate users are actively evaluating you against them.
-- No competitor mentions → the competitive landscape isn't on this audience's mental map despite industry-wide hype. Useful to know; means you aren't being framed as "yet another alternative" in this community.
+NARRATIVE: Which alternatives surface organically? Interpretation guide:
+- Heavy mentions of specific named alternatives → users think of your product next to these as alternatives or comparison points. Not inherently a loss signal — depends on sentiment (see excerpts.md).
+- Mentions of alternatives philosophically closest to your own product → organic mentions here indicate users are actively evaluating you against them.
+- No alternative mentions → the competitive landscape isn't on this audience's mental map despite industry-wide hype. Useful to know; means you aren't being framed as "yet another alternative" in this community.
 
 ---
 
-## 6. Messaging-platform mentions
+## 6. Platforms
 
-Organic mentions of messaging platforms in target-language conversations:
+Organic mentions of platforms in target-language conversations:
 
 ```
 {{stats.messaging_platforms}}
 ```
 
-NARRATIVE: This is the most important single input to any "which platform should we integrate first" decision — what do users actually talk about when messaging platforms come up? Rank order matters more than absolute count. Interpretation guide:
-- One platform dominates → organic demand for that platform's adapter
+NARRATIVE: This is the most important single input to any "which platform should we integrate first" decision — what do users actually talk about when platforms come up? Rank order matters more than absolute count. Interpretation guide:
+- One platform dominates → organic demand for that platform's integration
 - Multiple platforms competitive → consider which aligns with your product strategy
-- None mentioned significantly → users aren't blocked on messaging integration; re-prioritize elsewhere
+- None mentioned significantly → users aren't blocked on platform integration; re-prioritize elsewhere
 
 Cross-check with the "want to use vs using now" sentiment in excerpts.md.
 
 ---
 
-## 7. Friction signals
+## 7. Pain points
 
-Raw counts of friction-related keywords in target-language messages:
+Raw counts of pain-point-related keywords in target-language messages:
 
 ```
 {{stats.friction_signals}}
 ```
 
-NARRATIVE: Rank the friction types. Typical patterns:
-- `network_blocked` heavy → network-access friction is P1; a domestic mirror or alternative routing becomes urgent.
-- `error_generic` / `key_issue` / `oauth_issue` heavy → config UX problem; a setup wizard + localized error messages are high-ROI.
-- `confused` / `help_request` heavy → docs are failing; localized docs or LLM-translated docs become P1.
-- `broken` / `failed` with specific product context → bug triage priority.
+NARRATIVE: Rank the pain point types. Typical patterns:
+- Access/blocked issues heavy → access friction is P1; alternative access methods or localized solutions become urgent.
+- Generic errors / configuration issues heavy → config UX problem; a setup wizard + localized error messages are high-ROI.
+- Confusion / help requests heavy → docs are failing; localized docs or LLM-translated docs become P1.
+- Broken / failed with specific product context → bug triage priority.
 
-Identify the top 3 friction types and reference illustrative excerpts in `excerpts.md`.
+Identify the top 3 pain point types and reference illustrative excerpts in `excerpts.md`.
 
 ---
 
-## 8. Install paths
+## 8. Setup methods
 
-Mentions of deploy/install paths in target-language messages:
+Mentions of setup/deploy methods in target-language messages:
 
 ```
 {{stats.install_paths}}
 ```
 
-NARRATIVE: What install surfaces are users on? If WSL heavy → Windows-native documentation investment is warranted. If Docker heavy → containerized-deploy story matters. If a hosted-service option is heavily used → hosted experience is winning; self-install friction is a smaller issue than it seems.
+NARRATIVE: What setup surfaces are users on? If a specific method dominates (e.g., container-based, OS-native, or hosted), prioritize documentation and support for that path. A hosted option that's heavily used → hosted experience is winning; self-install friction is a smaller issue than it seems.
 
 ---
 
-## 9. Feature usage (depth signal)
+## 9. Topic mentions (depth signal)
 
 ```
 {{stats.features}}
 ```
 
-NARRATIVE: Are users engaging with your product's differentiator features, or using it as a thin chat UI? High mentions of differentiator features → community content should showcase advanced workflows. Low mentions → marketing and docs should lead with differentiators; users aren't discovering the value. Cross-tab with friction: if a differentiator feature is mentioned but so is `confused` → that feature has UX friction even for users who know about it.
+NARRATIVE: Are users engaging with your product's notable features, or using it as a thin UI? High mentions of key topics → community content should showcase advanced workflows. Low mentions → marketing and docs should lead with key capabilities; users aren't discovering the value. Cross-tab with pain points: if a topic is mentioned but so is confusion → that area has UX friction even for users who know about it.
 
 ---
 
@@ -169,20 +169,20 @@ If `topics.py` has been run, the aggregate topic distribution is:
 Total tagged: {{stats.topics.total_tagged}}
 
 NARRATIVE: Topic distribution tells you what the cohort is *actually talking about* once you sum across keyword hits. Typical interpretation:
-- Heavy `provider_config` + `install_help` → onboarding UX is the primary support burden; docs and provider-config UX fixes are high-ROI
-- Heavy `messaging_adapter` → users are actively trying to wire your product into their messaging platforms; adapter completeness matters
-- Heavy `bug_report` → a stable-release quality problem
-- Heavy `feature_request` → indicates product pull but unmet demand
-- Heavy `general_discussion` → healthy community but no strong signal
-- Significant `brand_identity` → users are confused about what's official; brand-protection priority
+- Heavy setup/config + install topics → onboarding UX is the primary support burden; docs and config UX fixes are high-ROI
+- Heavy platform-integration topics → users are actively trying to wire your product into their platforms; integration completeness matters
+- Heavy bug reports → a stable-release quality problem
+- Heavy feature requests → indicates product pull but unmet demand
+- Heavy general discussion → healthy community but no strong signal
+- Significant brand-identity topics → users are confused about what's official; brand-protection priority
 
-Cross-reference with §10 (brand audit), §7 (friction), §6 (messaging platforms). `topics_by_category.json` gives per-category message-ID lists if you want to pull representative examples (paraphrase for `excerpts.md`).
+Cross-reference with §10 (brand confusion), §7 (pain points), §6 (platforms). `topics_by_category.json` gives per-category message-ID lists if you want to pull representative examples (paraphrase for `excerpts.md`).
 
 ---
 
-## 10. Brand audit — impersonator domain mentions
+## 10. Brand confusion — external domain mentions
 
-Impersonator domain mentions (both as URLs and bare-text references):
+External domain mentions (both as URLs and bare-text references):
 
 ```
 {{stats.urls.impersonator_domains}}
@@ -206,11 +206,11 @@ Top 50 domains mentioned overall:
 {{stats.urls.top_domains}}
 ```
 
-NARRATIVE: Compare `impersonator_domains` vs `official_domains` mention counts. If impersonator mentions are non-trivial (>5% of domain mentions), brand-protection priority escalates. If impersonator mentions are *in* question contexts ("is X official?"), users are uncertain — publishing a canonical "official presence" statement is cheap and high-value. If impersonator mentions are in *recommendation* contexts ("I followed this guide from X"), impersonator sites are actively serving as your documentation — risk is much higher. Excerpts in `excerpts.md` should disambiguate this.
+NARRATIVE: Compare external/unofficial domain mentions vs official domain mentions. If unofficial mentions are non-trivial (>5% of domain mentions), brand-protection priority escalates. If unofficial mentions are *in* question contexts ("is X official?"), users are uncertain — publishing a canonical "official presence" statement is cheap and high-value. If unofficial mentions are in *recommendation* contexts ("I followed this guide from X"), third-party sites are actively serving as your documentation — risk is much higher. Excerpts in `excerpts.md` should disambiguate this.
 
 ---
 
-## 11. Shadow community mentions
+## 11. External communities
 
 Where users say they hang out outside this chat:
 
@@ -232,21 +232,21 @@ NARRATIVE: Which external communities surface? These are the platforms where you
 | **Target-language answered rate** | **{{stats.help_answered.target_answered_rate}}** |
 
 NARRATIVE: The answered-rate is a direct community-health signal. If <70%, target-language users are being under-served by the existing help system. If <50%, questions are effectively getting ignored and users will leave for communities that help them. Interpretation guide:
-- Low rate + heavy `help_request` / `confused` friction → need a moderator or LLM-based auto-responder; at minimum, a pinned FAQ.
-- Low rate + specific topic clusters unanswered (e.g., a specific adapter setup, a specific provider config) → targeted docs fix those specific cases.
+- Low rate + heavy confusion / help-request pain points → need a moderator or LLM-based auto-responder; at minimum, a pinned FAQ.
+- Low rate + specific topic clusters unanswered (e.g., a specific integration setup, a specific config issue) → targeted docs fix those specific cases.
 - High rate → the existing volunteer ecosystem is working; focus resources elsewhere.
 
 ---
 
-## 13. Acquisition-channel markers
+## 13. Discovery channels
 
 Organic mentions of how users found your product:
 
 ```
-{{stats.acquisition_markers}}
+{{stats.acquisition_channels}}
 ```
 
-NARRATIVE: These are noisy signals from messages like "I saw it on [X]" or "found this via [Y]." Treat counts as directional, not authoritative. If GitHub / HuggingFace dominate → developer-native channels are working. If local platforms dominate → localized content marketing is the driver. If Twitter/X dominates → international pipeline is working. Use this to allocate where new content should be published.
+NARRATIVE: These are noisy signals from messages like "I saw it on [X]" or "found this via [Y]." Treat counts as directional, not authoritative. If developer-native platforms dominate → developer channels are working. If local platforms dominate → localized content marketing is the driver. If international social platforms dominate → international pipeline is working. Use this to allocate where new content should be published.
 
 ---
 
@@ -254,11 +254,11 @@ NARRATIVE: These are noisy signals from messages like "I saw it on [X]" or "foun
 
 NARRATIVE: Fill these in from `crosstabs.json` / `crosstabs.md`, or extend the pipeline. The highest-value cross-tabs:
 
-1. **Provider × Location proxy** — are in-region users more likely to mention regional providers than overseas users?
-2. **Messaging platform × Retention** — do users who mention specific platforms stick around longer? (Selection bias hazard; interpret carefully.)
-3. **Impersonator mention × Friction** — do users who referenced impersonator sites report more confusion?
-4. **Feature usage × Retention** — do users who mention your differentiator features retain better? (The "are differentiators sticky" question.)
-5. **Install path × Friction** — do WSL users hit more friction than Linux-native?
+1. **Top mentions × Timezone distribution** — are in-region users more likely to mention different tools/products than overseas users?
+2. **Platforms × Retention** — do users who mention specific platforms stick around longer? (Selection bias hazard; interpret carefully.)
+3. **Brand confusion × Pain points** — do users who referenced unofficial sites report more confusion?
+4. **Topic mentions × Retention** — do users who mention key topics retain better? (The "are notable features sticky" question.)
+5. **Setup methods × Pain points** — do users on a specific setup method hit more friction than others?
 
 ---
 
@@ -281,9 +281,9 @@ Most important for this specific run:
 
 - Self-selection: only users who joined this chat and posted are counted. Lurkers and non-joiners are invisible.
 - Language classification is heuristic; heavy code-switching may be misclassified. Reviewed samples indicate ~{{NARRATIVE: describe spot-check accuracy, e.g., "~90% accurate on a 50-message sample"}}.
-- Impersonator-domain mention context is not auto-classified. See excerpts.md for disambiguation.
+- Unofficial-domain mention context is not auto-classified. See excerpts.md for disambiguation.
 - Lapsed users are observationally equivalent to retained-but-quiet users — "stopped using the product" is not directly recoverable.
-- Regional-provider clustering and shadow-community platform lists are illustrative starting points, not exhaustive — extend them for your market.
+- Regional clustering and external-community platform lists are illustrative starting points, not exhaustive — extend them for your market.
 
 ---
 

@@ -1,15 +1,12 @@
 """LLM topic-tagging pass for the community chat-history analysis pipeline.
 
 Tags every target-language / mixed-language message with one of a fixed
-topic set by shelling out to a locally-configured LLM CLI tool (any CLI that
-accepts a prompt and prints the response to stdout). Configure the command
-via the LLM_CLI environment variable (space-separated, default: "hermes chat
--q") — see run_llm_cli() below.
+topic set by shelling out to a locally-configured LLM CLI tool. Configure
+the command via the LLM_COMMAND environment variable.
 
 Works for any target language (see `languages.py` for the supported list) —
-pass `--target-language ja` for Japanese, `--target-language none` to tag
-every message regardless of language classification, etc. Defaults to `zh`
-for backward compatibility.
+pass `--target-language ja` for Japanese, `--target-language none` (default)
+to tag every message regardless of language classification.
 
 No direct API calls, no external API keys needed from this script itself —
 your provider's key lives wherever your chosen CLI expects it, and the CLI
@@ -537,10 +534,10 @@ def main() -> int:
     p.add_argument(
         "--target-language",
         type=str,
-        default="zh",
-        help="Language code to filter/tag messages for (see languages.py "
-        "LANGUAGE_PROFILES; default: zh). Pass 'none' to tag every message "
-        "regardless of language classification.",
+        default="none",
+        help="Language code to classify messages (see languages.py "
+        "LANGUAGE_PROFILES; default: none — tags every message). Pass a "
+        "language code to only tag target-language + mixed messages.",
     )
     p.add_argument(
         "--out",

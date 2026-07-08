@@ -291,9 +291,9 @@ def _lark_timestamp(raw: Any) -> datetime:
                 try:
                     dt = datetime.strptime(raw, fmt)
                     # The export tool emits these in LOCAL time with NO tz marker;
-                    # assume a fixed offset (default UTC+8, override via
+                    # assume a fixed offset (default UTC, override via
                     # TS_UTC_OFFSET_HOURS env var) to avoid silently misclassifying.
-                    offset = float(os.environ.get("TS_UTC_OFFSET_HOURS", "8"))
+                    offset = float(os.environ.get("TS_UTC_OFFSET_HOURS", "0"))
                     return dt.replace(
                         tzinfo=timezone(timedelta(hours=offset))
                     ).astimezone(timezone.utc)

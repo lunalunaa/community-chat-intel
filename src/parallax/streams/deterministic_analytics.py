@@ -70,7 +70,7 @@ def main() -> None:
     for line in CHAT_JSONL.open():
         try:
             m = json.loads(line)
-        except:
+        except Exception:
             continue
         ts = parse_ts(m.get("create_time", ""))
         if not ts:
